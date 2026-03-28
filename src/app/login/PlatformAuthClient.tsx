@@ -351,7 +351,7 @@ export function PlatformAuthClient({ supabaseConfigured }: { supabaseConfigured:
           </div>
         </div>
 
-        <div className="ucalgary-badge">
+        <div className="ucalgary-badge" style={{ top: 28, right: 28, bottom: 'auto' }}>
           <img
             src="/sign-in-ref/badge.png"
             alt="University of Calgary 60th Anniversary"

@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import './filr.css'
 
 export const metadata: Metadata = {
-  title: 'FILR — Drop. Share. Gone.',
-  description: 'Demo file sharing app',
+  title: 'NoRedundancy — File Share',
+  description: 'Secure file sharing',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

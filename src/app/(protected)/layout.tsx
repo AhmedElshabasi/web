@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { supabaseServerClientOrNull } from '@/lib/supabaseServer'
-import { TopNav } from '@/components/TopNav'
+import { MainPageShell } from '@/components/MainPageShell'
+import './main-page-reference.css'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +17,5 @@ export default async function ProtectedLayout({
   const user = data.user
   if (!user) redirect('/login')
 
-  return (
-    <>
-      <TopNav userEmail={user.email ?? null} />
-      {children}
-    </>
-  )
+  return <MainPageShell userEmail={user.email ?? null}>{children}</MainPageShell>
 }
-
