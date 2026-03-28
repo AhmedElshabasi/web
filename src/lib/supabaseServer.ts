@@ -1,18 +1,14 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
-
-function envOk() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-}
+import { getSupabasePublicKey, getSupabaseUrl, isSupabaseConfigured, missingSupabaseEnvMessage } from '@/lib/supabaseEnv'
 
 export function supabaseServerClientOrNull() {
-  if (!envOk()) return null
+  if (!isSupabaseConfigured()) return null
 
-  // envOk() ensures these exist, but TS can't narrow automatically.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabaseUrl = getSupabaseUrl()!
+  const publicKey = getSupabasePublicKey()!
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(supabaseUrl, publicKey, {
     cookies: {
       getAll: async () => {
         const cookieStore = await cookies()
@@ -25,7 +21,7 @@ export function supabaseServerClientOrNull() {
 export function supabaseServerClient() {
   const client = supabaseServerClientOrNull()
   if (!client) {
-    throw new Error('Missing Supabase env vars (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).')
+    throw new Error(missingSupabaseEnvMessage())
   }
   return client
 }

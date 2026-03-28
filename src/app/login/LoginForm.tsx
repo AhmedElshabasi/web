@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import { missingSupabaseEnvMessage } from '@/lib/supabaseEnv'
 import styles from './ucalgary-login.module.css'
 
 export function LoginForm() {
@@ -29,7 +30,7 @@ export function LoginForm() {
 
     try {
       if (!supabaseBrowser) {
-        throw new Error('Configure Supabase env vars (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).')
+        throw new Error(missingSupabaseEnvMessage())
       }
       if (mode === 'signup') {
         const { error: signUpError } = await supabaseBrowser.auth.signUp({
