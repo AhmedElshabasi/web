@@ -184,6 +184,12 @@
   margin-bottom: 14px;
 }
 
+.nameRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .field label {
   display: block;
   font-size: 11px;
@@ -227,6 +233,27 @@
 }
 
 .input:focus {
+  border-color: var(--uc-red);
+  box-shadow: 0 0 0 3px rgba(207, 7, 34, 0.18);
+}
+
+.inputPlain {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.inputPlain::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.inputPlain:focus {
   border-color: var(--uc-red);
   box-shadow: 0 0 0 3px rgba(207, 7, 34, 0.18);
 }

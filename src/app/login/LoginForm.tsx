@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import { missingSupabaseEnvMessage } from '@/lib/supabaseEnv'
+import { isUcalgaryEmail, resolveUcalgaryEmail } from '@/lib/ucalgaryEmail'
 import styles from './ucalgary-login.module.css'
 
 export function LoginForm() {
@@ -13,16 +14,13 @@ export function LoginForm() {
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [emailLocal, setEmailLocal] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const email = (() => {
-    const raw = emailLocal.trim()
-    if (!raw) return ''
-    if (raw.includes('@')) return raw
-    return `${raw}@ucalgary.ca`
-  })()
+  const email = resolveUcalgaryEmail(emailLocal)
 
   const submit = async () => {
     setError(null)
@@ -32,10 +30,24 @@ export function LoginForm() {
       if (!supabaseBrowser) {
         throw new Error(missingSupabaseEnvMessage())
       }
+      if (!isUcalgaryEmail(email)) {
+        throw new Error('Use your @ucalgary.ca email only.')
+      }
       if (mode === 'signup') {
+        const fn = firstName.trim()
+        const ln = lastName.trim()
+        if (!fn || !ln) {
+          throw new Error('Enter your first and last name.')
+        }
         const { error: signUpError } = await supabaseBrowser.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              first_name: fn,
+              last_name: ln,
+            },
+          },
         })
         if (signUpError) throw signUpError
         // If email confirmations are disabled, user will be signed in immediately.
@@ -82,6 +94,35 @@ export function LoginForm() {
         </button>
       </div>
 
+      {mode === 'signup' ? (
+        <div className={styles.nameRow}>
+          <div className={styles.field}>
+            <label htmlFor="firstName">First name</label>
+            <input
+              id="firstName"
+              className={styles.inputPlain}
+              type="text"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Given name"
+            />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="lastName">Last name</label>
+            <input
+              id="lastName"
+              className={styles.inputPlain}
+              type="text"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Family name"
+            />
+          </div>
+        </div>
+      ) : null}
+
       <div className={styles.field}>
         <label htmlFor="emailLocal">Email</label>
         <div className={styles.emailSuffix}>
@@ -99,7 +140,10 @@ export function LoginForm() {
             aria-invalid={!!error}
           />
         </div>
-        <div className={styles.hint}>Will sign in as <span className={styles.mono}>{email || '…@ucalgary.ca'}</span></div>
+        <div className={styles.hint}>
+          Must be <span className={styles.mono}>@ucalgary.ca</span> — signing in as{' '}
+          <span className={styles.mono}>{email || '…@ucalgary.ca'}</span>
+        </div>
       </div>
 
       <div className={styles.field}>
@@ -121,7 +165,17 @@ export function LoginForm() {
 
       {error ? <div className={styles.errorMsg}>{error}</div> : null}
 
-      <button className={styles.primaryBtn} onClick={submit} disabled={busy || !email || !password} type="button">
+      <button
+        className={styles.primaryBtn}
+        onClick={submit}
+        disabled={
+          busy ||
+          !email ||
+          !password ||
+          (mode === 'signup' && (!firstName.trim() || !lastName.trim()))
+        }
+        type="button"
+      >
         {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
       </button>
 
