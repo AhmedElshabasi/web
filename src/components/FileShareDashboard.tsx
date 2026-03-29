@@ -22,7 +22,7 @@ export type UploadPackageRow = {
 
 function ext(name: string) {
   const parts = name.split('.')
-  return parts.length > 1 ? parts.pop()!.slice(0, 5).toUpperCase() : 'FILE'
+  return parts.length > 1 ? parts.pop()!.slice(0, 4).toUpperCase() : 'FILE'
 }
 
 function fmtSize(b: number) {
@@ -77,6 +77,8 @@ export function FileShareDashboard({
     setToast(message)
     window.setTimeout(() => setToast(null), 2200)
   }, [])
+
+  const workspaceLink = `${publicBaseUrl}/receive`
 
   const addFiles = (newFiles: File[]) => {
     setQueue((prev) => {
@@ -150,7 +152,7 @@ export function FileShareDashboard({
       }
 
       const n = queue.length
-      const meta = `${n} file${n === 1 ? '' : 's'} • expires in ${expiryHours}h • max ${maxDownloads} download${maxDownloads === 1 ? '' : 's'}${note.trim() ? ` • ${note.trim()}` : ''}`
+      const meta = `${n} file${n === 1 ? '' : 's'} • ${fmtSize(queueBytes)} • expires in ${expiryHours}h • max ${maxDownloads} download${maxDownloads === 1 ? '' : 's'}${note.trim() ? ' • note added' : ''}`
       setLastBatchMeta(meta)
       setQueue([])
       setNote('')
@@ -165,44 +167,56 @@ export function FileShareDashboard({
   }
 
   const copyWorkspaceLink = () => {
-    const text = `${publicBaseUrl}/receive`
-    void navigator.clipboard.writeText(text).then(() => {
+    void navigator.clipboard.writeText(workspaceLink).then(() => {
       showToast('Link copied.')
     })
   }
 
-  const renderShareList = () => {
-    if (!initialUploads.length) {
-      return (
-        <div className="empty-state">No share links yet. Generate one and it will show up here.</div>
-      )
-    }
+  const shareListBody =
+    initialUploads.length === 0 ? (
+      <div className="empty-state">No shares yet. Generate a link and it will show up here.</div>
+    ) : (
+      initialUploads.map((u) => {
+        const files = u.upload_files || []
+        const total = files.reduce((s, f) => s + (typeof f.size === 'number' ? f.size : 0), 0)
+        const first = files[0]
+        const title =
+          first && files.length > 1
+            ? `${first.original_name} +${files.length - 1}`
+            : (first?.original_name ?? 'Share')
+        const names = files.map((f) => f.original_name).join(', ')
 
-    return initialUploads.flatMap((u) => {
-      const files = u.upload_files || []
-      return files.map((f) => {
-        const url = supabaseBrowser?.storage.from('uploads').getPublicUrl(f.storage_path).data.publicUrl ?? '#'
-        const size = typeof f.size === 'number' ? f.size : 0
         return (
-          <div key={f.id} className="share-item">
-            <div className="file-ext">{ext(f.original_name)}</div>
-            <div className="share-meta">
-              <div className="share-name">{f.original_name}</div>
-              <div className="share-detail">
-                {fmtSize(size)} · {u.uploader_email || 'unknown'} · {formatShortDate(u.created_at)}
-                {u.note ? ` · ${u.note}` : ''}
+          <div key={u.id} className="share-item">
+            <div className="share-head">
+              <div>
+                <div className="share-title">{title}</div>
+                <div className="share-sub">
+                  {files.length} file{files.length === 1 ? '' : 's'} • {fmtSize(total)} • shared{' '}
+                  {formatShortDate(u.created_at)}
+                  {u.note ? ` • ${u.note}` : ''}
+                </div>
               </div>
+              <span className="share-pill active">Active</span>
             </div>
-            <a className="download-btn" href={url} download={f.original_name}>
-              Download
-            </a>
+            <div className="share-sub" style={{ marginBottom: 8 }}>
+              {names}
+            </div>
+            <div className="share-sub" style={{ fontFamily: 'var(--mono)', wordBreak: 'break-all' }}>
+              {workspaceLink}
+            </div>
+            <div className="share-actions">
+              <button type="button" className="mini-btn" onClick={copyWorkspaceLink}>
+                Copy link
+              </button>
+              <button type="button" className="mini-btn" onClick={() => showToast('Extend is not available yet.')}>
+                Extend 24h
+              </button>
+            </div>
           </div>
         )
       })
-    })
-  }
-
-  const workspaceLink = `${publicBaseUrl}/receive`
+    )
 
   return (
     <>
@@ -215,11 +229,10 @@ export function FileShareDashboard({
               without the clutter.
             </h1>
             <p>
-              This version matches the Sign_In_Page styling and removes the old 6-character share code flow. It now
-              generates direct share links only.
+              Create direct share links, manage expiry, and keep transfers clean without the old code-based mess.
             </p>
           </div>
-          <div className="hero-meta">UCalgary-inspired visual theme</div>
+          <div className="hero-meta">Secure file sharing workspace</div>
         </div>
       </section>
 
@@ -227,17 +240,17 @@ export function FileShareDashboard({
         <div className="stat-card red">
           <div className="stat-label">Files queued</div>
           <div className="stat-value">{queue.length}</div>
-          <div className="stat-sub">Ready to share</div>
+          <div className="stat-sub">Ready to send</div>
         </div>
         <div className="stat-card gold">
-          <div className="stat-label">Shared this session</div>
+          <div className="stat-label">Transfers created</div>
           <div className="stat-value">{serverUploadCount}</div>
-          <div className="stat-sub">Links generated</div>
+          <div className="stat-sub">Generated links</div>
         </div>
         <div className="stat-card blue">
-          <div className="stat-label">Total data</div>
+          <div className="stat-label">Total size moved</div>
           <div className="stat-value">{fmtSize(serverTotalBytes + queueBytes)}</div>
-          <div className="stat-sub">Across generated shares</div>
+          <div className="stat-sub">Across all shares</div>
         </div>
       </div>
 
@@ -250,13 +263,16 @@ export function FileShareDashboard({
       <div className="layout">
         <section className="card">
           <div className="card-header">
-            <div className="card-title">📤 Upload files</div>
+            <div className="card-title">📤 Create share</div>
           </div>
           <div className="card-body">
             <div
               className={`drop-zone${dragOver ? ' dragover' : ''}`}
               id="drop-zone"
-              onClick={() => inputRef.current?.click()}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('button')) return
+                inputRef.current?.click()
+              }}
               onDragOver={(e) => {
                 e.preventDefault()
                 setDragOver(true)
@@ -269,52 +285,66 @@ export function FileShareDashboard({
               }}
               role="presentation"
             >
-              <div className="drop-icon">↑</div>
-              <h2>Drop files here</h2>
-              <p>Or click to browse. Duplicate files are ignored automatically.</p>
+              <div className="drop-icon">↥</div>
+              <div className="drop-title">Drag files here</div>
+              <div className="drop-sub">or choose files manually</div>
+              <input
+                id="file-input"
+                ref={inputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => {
+                  const files = [...(e.target.files || [])]
+                  if (files.length) addFiles(files)
+                  e.target.value = ''
+                }}
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  inputRef.current?.click()
+                }}
+              >
+                Browse files
+              </button>
             </div>
-            <input
-              id="file-input"
-              ref={inputRef}
-              type="file"
-              multiple
-              onChange={(e) => {
-                const files = [...(e.target.files || [])]
-                if (files.length) addFiles(files)
-                e.target.value = ''
-              }}
-            />
 
             <div className="file-queue" id="file-queue">
-              {!queue.length ? (
-                <div className="empty-state">No files queued yet.</div>
-              ) : (
-                queue.map((file, index) => (
-                  <div key={`${file.name}-${file.size}-${index}`} className="file-item">
-                    <div className="file-ext">{ext(file.name)}</div>
-                    <div className="file-meta">
+              {queue.map((file, index) => (
+                <div key={`${file.name}-${file.size}-${index}`} className="file-row">
+                  <div className="file-row-left">
+                    <div className="file-badge">{ext(file.name)}</div>
+                    <div>
                       <div className="file-name">{file.name}</div>
-                      <div className="file-size">{fmtSize(file.size)}</div>
+                      <div className="file-meta">{fmtSize(file.size)}</div>
                     </div>
-                    <button type="button" className="remove-btn" onClick={() => removeAt(index)}>
-                      Remove
-                    </button>
                   </div>
-                ))
-              )}
+                  <button
+                    type="button"
+                    className="file-remove"
+                    onClick={() => removeAt(index)}
+                    aria-label="Remove file"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
 
             <div className="form-grid" id="share-settings" style={{ display: hasFiles ? undefined : 'none' }}>
               <div className="form-field">
-                <label htmlFor="expiry">Expires after</label>
+                <label htmlFor="expiry">Link expiry</label>
                 <select
                   id="expiry"
                   value={expiryHours}
                   onChange={(e) => setExpiryHours(Number(e.target.value))}
                 >
-                  <option value={1}>1 hour</option>
-                  <option value={6}>6 hours</option>
+                  <option value={12}>12 hours</option>
                   <option value={24}>24 hours</option>
+                  <option value={48}>48 hours</option>
                   <option value={72}>72 hours</option>
                 </select>
               </div>
@@ -372,7 +402,9 @@ export function FileShareDashboard({
             <div className="card-title">📥 Shared files</div>
           </div>
           <div className="card-body">
-            <div id="share-list">{renderShareList()}</div>
+            <div className="share-list" id="share-list">
+              {shareListBody}
+            </div>
           </div>
         </section>
       </div>

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import { ActivityLogPanel } from '@/components/ActivityLogPanel'
+import { RecentTransfersPanel } from '@/components/RecentTransfersPanel'
 
 function initialsFromEmail(email: string | null): string {
   if (!email) return 'NR'
@@ -22,19 +24,46 @@ function displayNameFromEmail(email: string | null): string {
   return local || 'Team Workspace'
 }
 
+type WorkspacePage = 'file-share' | 'recent-transfers' | 'activity-log'
+
+const TOPBAR_TITLES: Record<WorkspacePage, string> = {
+  'file-share': 'File Share',
+  'recent-transfers': 'Recent Transfers',
+  'activity-log': 'Activity Log',
+}
+
 export function MainPageShell({
   userEmail,
-  children,
+  fileShare,
 }: {
   userEmail: string | null
-  children: ReactNode
+  fileShare: ReactNode
 }) {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   const [signOutBusy, setSignOutBusy] = useState(false)
+  const [activePage, setActivePage] = useState<WorkspacePage>('file-share')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setDark(localStorage.getItem('theme') === 'dark')
+    const nr = localStorage.getItem('nr-theme')
+    if (nr === 'dark') {
+      setDark(true)
+      return
+    }
+    if (nr === 'light') {
+      setDark(false)
+      return
+    }
+    const legacy = localStorage.getItem('theme')
+    if (legacy === 'light') {
+      setDark(false)
+      return
+    }
+    if (legacy === 'dark') {
+      setDark(true)
+      return
+    }
+    setDark(true)
   }, [])
 
   useEffect(() => {
@@ -74,17 +103,26 @@ export function MainPageShell({
 
           <div className="sidebar-section">
             <div className="sidebar-section-label">Workspace</div>
-            <button type="button" className="nav-item active">
-              <span>↗</span> File Share <span className="nav-badge">Live</span>
+            <button
+              type="button"
+              className={`nav-item${activePage === 'file-share' ? ' active' : ''}`}
+              onClick={() => setActivePage('file-share')}
+            >
+              <span>↗</span> File Share<span className="nav-badge">Live</span>
             </button>
-            <button type="button" className="nav-item">
+            <button
+              type="button"
+              className={`nav-item${activePage === 'recent-transfers' ? ' active' : ''}`}
+              onClick={() => setActivePage('recent-transfers')}
+            >
               <span>◌</span> Recent Transfers
             </button>
-            <button type="button" className="nav-item">
+            <button
+              type="button"
+              className={`nav-item${activePage === 'activity-log' ? ' active' : ''}`}
+              onClick={() => setActivePage('activity-log')}
+            >
               <span>◌</span> Activity Log
-            </button>
-            <button type="button" className="nav-item">
-              <span>◌</span> Storage Policy
             </button>
           </div>
 
@@ -96,52 +134,53 @@ export function MainPageShell({
                 <div className="user-email">{userEmail ?? 'share@noredundancy.app'}</div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              disabled={signOutBusy}
-              style={{
-                marginTop: 10,
-                width: '100%',
-                padding: '8px 10px',
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255,255,255,.35)',
-                fontSize: 12,
-                cursor: signOutBusy ? 'wait' : 'pointer',
-                textAlign: 'left',
-                fontFamily: 'inherit',
-              }}
-            >
-              {signOutBusy ? 'Signing out…' : 'Sign out'}
-            </button>
           </div>
         </aside>
 
-        <div className="main-content">
+        <main className="main-content">
           <div className="topbar">
-            <div className="topbar-title">File Share</div>
+            <div className="topbar-title">{TOPBAR_TITLES[activePage]}</div>
             <div className="topbar-actions">
+              <button
+                type="button"
+                className="topbar-sign-out"
+                onClick={() => void signOut()}
+                disabled={signOutBusy}
+              >
+                {signOutBusy ? '…' : 'Sign out'}
+              </button>
               <button
                 type="button"
                 className="theme-toggle"
                 onClick={() =>
                   setDark((d) => {
                     const next = !d
-                    localStorage.setItem('theme', next ? 'dark' : 'light')
+                    localStorage.setItem('nr-theme', next ? 'dark' : 'light')
                     return next
                   })
                 }
-                id="theme-toggle"
               >
                 {dark ? '☀️ Light mode' : '🌙 Dark mode'}
               </button>
-              <div className="ai-badge">✦ Styled to match sign-in theme</div>
+              <div className="ai-badge">✦ Transfer workspace</div>
             </div>
           </div>
 
-          <div className="content">{children}</div>
-        </div>
+          <div className="content">
+            <section className={`page-panel${activePage === 'file-share' ? ' active' : ''}`} id="page-file-share">
+              {fileShare}
+            </section>
+            <section
+              className={`page-panel${activePage === 'recent-transfers' ? ' active' : ''}`}
+              id="page-recent-transfers"
+            >
+              <RecentTransfersPanel />
+            </section>
+            <section className={`page-panel${activePage === 'activity-log' ? ' active' : ''}`} id="page-activity-log">
+              <ActivityLogPanel />
+            </section>
+          </div>
+        </main>
       </div>
     </div>
   )

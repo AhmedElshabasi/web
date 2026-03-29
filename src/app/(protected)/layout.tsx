@@ -17,5 +17,5 @@ export default async function ProtectedLayout({
   const user = data.user
   if (!user) redirect('/login')
 
-  return <MainPageShell userEmail={user.email ?? null}>{children}</MainPageShell>
+  return <MainPageShell userEmail={user.email ?? null} fileShare={children} />
 }

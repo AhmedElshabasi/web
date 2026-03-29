@@ -1,0 +1,2440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoRedundancy — File Share</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --red: #cf0722;
+      --red-light: #e8001a;
+      --gold: #f0b21f;
+      --gold-dark: #c9920a;
+      --bg: #f8f6f2;
+      --white: #ffffff;
+      --ink: #1c1c1e;
+      --ink2: #3d3d3d;
+      --muted: #888;
+      --border: #e2ddd6;
+      --surface: #ffffff;
+      --surface2: #f2ede6;
+      --green: #1a7a4a;
+      --blue: #003d6e;
+      --mono: 'DM Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+      --serif: 'Instrument Serif', serif;
+      --radius: 10px;
+      --shadow: 0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+      --shadow-lg: 0 8px 40px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06);
+    }
+
+    body.dark-mode {
+      --bg: #0f1115;
+      --white: #16181d;
+      --ink: #e8eaf0;
+      --ink2: #c7ccd4;
+      --muted: #9aa0aa;
+      --border: #2a2f36;
+      --surface: #16181d;
+      --surface2: #1d2026;
+      --green: #3dd68c;
+      --blue: #5da8ff;
+      --shadow: 0 2px 12px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
+      --shadow-lg: 0 8px 40px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.3);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      transition: background .2s ease, color .2s ease;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+    }
+
+    .sidebar {
+      width: 240px;
+      min-height: 100vh;
+      background: #111315;
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+
+    .sidebar-logo-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-logo-mark .icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .sidebar-wordmark {
+      font-family: var(--serif);
+      font-size: 20px;
+      color: #fff;
+      letter-spacing: -.3px;
+    }
+
+    .sidebar-sub {
+      font-size: 10px;
+      color: rgba(255,255,255,.3);
+      margin-top: 4px;
+      font-family: var(--mono);
+      letter-spacing: .05em;
+    }
+
+    .sidebar-section {
+      padding: 20px 12px 8px;
+    }
+
+    .sidebar-section-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: rgba(255,255,255,.25);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      padding: 0 8px;
+      margin-bottom: 6px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 7px;
+      color: rgba(255,255,255,.5);
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 2px;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      transition: .15s ease;
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.82);
+    }
+
+    .nav-item.active {
+      background: rgba(204,0,0,.2);
+      color: #fff;
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--red);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-family: var(--mono);
+    }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      padding: 16px 12px;
+      border-top: 1px solid rgba(255,255,255,.07);
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.04);
+    }
+
+    .user-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .user-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,.8);
+    }
+
+    .user-email {
+      font-size: 10px;
+      color: rgba(255,255,255,.3);
+      font-family: var(--mono);
+    }
+
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .topbar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .topbar-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .2s ease;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .ai-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #1a1a1a, #333);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 28px;
+    }
+
+    .page-panel {
+      display: none;
+    }
+
+    .page-panel.active {
+      display: block;
+    }
+
+    .hero {
+      background: #111315;
+      border-radius: 18px;
+      padding: 32px;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 30% 20%, rgba(204,0,0,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 80%, rgba(245,168,0,.1) 0%, transparent 50%);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: end;
+    }
+
+    .hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 400;
+      letter-spacing: -.04em;
+      line-height: .95;
+      margin-bottom: 10px;
+    }
+
+    .hero p {
+      max-width: 540px;
+      font-size: 14px;
+      color: rgba(255,255,255,.65);
+      line-height: 1.6;
+    }
+
+    .hero-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 3px;
+    }
+
+    .stat-card.red::after { background: var(--red); }
+    .stat-card.gold::after { background: var(--gold); }
+    .stat-card.blue::after { background: var(--blue); }
+    .stat-card.green::after { background: var(--green); }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-family: var(--serif);
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 14px;
+      padding: 32px 20px;
+      background: linear-gradient(180deg, var(--surface), var(--surface2));
+      text-align: center;
+      transition: .2s ease;
+      cursor: pointer;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--red);
+      background: linear-gradient(180deg, var(--surface), rgba(207,7,34,.04));
+    }
+
+    .drop-icon {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(207,7,34,.08);
+      color: var(--red);
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .drop-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .drop-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .secondary-btn,
+    .primary-btn {
+      border-radius: 10px;
+      padding: 11px 14px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .secondary-btn {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+
+    .secondary-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .primary-btn {
+      background: var(--red);
+      color: #fff;
+      border: 1px solid var(--red);
+      width: 100%;
+      margin-top: 16px;
+    }
+
+    .primary-btn:hover {
+      background: var(--red-light);
+      border-color: var(--red-light);
+    }
+
+    .file-queue {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    .file-row-left {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--red);
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+
+    .file-name {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 3px;
+      word-break: break-word;
+    }
+
+    .file-meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .file-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px;
+      flex-shrink: 0;
+    }
+
+    .file-remove:hover {
+      color: var(--red);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .form-field.full {
+      grid-column: 1 / -1;
+    }
+
+    .form-field label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea,
+    .rt-search,
+    .rt-filter,
+    .rt-sort {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+      transition: .18s ease;
+    }
+
+    .form-field textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus,
+    .rt-search:focus,
+    .rt-filter:focus,
+    .rt-sort:focus {
+      border-color: var(--red);
+    }
+
+    .result-box {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid rgba(26,122,74,.2);
+      background: rgba(26,122,74,.06);
+      border-radius: 12px;
+    }
+
+    .result-head {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--green);
+    }
+
+    .link-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      margin-bottom: 10px;
+    }
+
+    .share-link {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      font-size: 12px;
+      font-family: var(--mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .helper {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .share-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .share-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: linear-gradient(180deg, var(--surface), rgba(0,0,0,0));
+    }
+
+    .share-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+
+    .share-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .share-sub {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .share-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .share-pill.active {
+      background: rgba(26,122,74,.10);
+      color: var(--green);
+      border-color: rgba(26,122,74,.18);
+    }
+
+    .share-pill.expiring {
+      background: rgba(240,178,31,.12);
+      color: #916300;
+      border-color: rgba(240,178,31,.22);
+    }
+
+    .share-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .mini-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .mini-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 30px 12px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+
+    .recent-transfers-page {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .rt-hero {
+      background: #111315;
+      border-radius: 18px;
+      padding: 28px;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .rt-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 60% at 20% 15%, rgba(204,0,0,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 85% 80%, rgba(245,168,0,.10) 0%, transparent 50%);
+    }
+
+    .rt-hero-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 18px;
+    }
+
+    .rt-kicker {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.55);
+      margin-bottom: 10px;
+    }
+
+    .rt-hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(28px, 4vw, 46px);
+      font-weight: 400;
+      line-height: .98;
+      letter-spacing: -.03em;
+      margin-bottom: 10px;
+    }
+
+    .rt-hero p {
+      max-width: 560px;
+      color: rgba(255,255,255,.68);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .rt-live-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.08);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .rt-live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(61,214,140,.12);
+    }
+
+    .rt-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .rt-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .rt-stat::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .rt-stat.red::after { background: var(--red); }
+    .rt-stat.gold::after { background: var(--gold); }
+    .rt-stat.blue::after { background: var(--blue); }
+    .rt-stat.green::after { background: var(--green); }
+
+    .rt-stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .rt-stat-value {
+      font-family: var(--serif);
+      font-size: 34px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .rt-stat-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .rt-layout {
+      display: grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap: 20px;
+    }
+
+    .rt-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .rt-search {
+      flex: 1 1 260px;
+      min-width: 220px;
+      padding: 0 14px;
+      height: 42px;
+    }
+
+    .rt-filter,
+    .rt-sort {
+      min-width: 150px;
+      height: 42px;
+      padding: 0 12px;
+    }
+
+    .rt-table-wrap {
+      overflow: hidden;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .rt-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .rt-table thead th {
+      background: var(--surface2);
+      text-align: left;
+      padding: 14px 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rt-table tbody tr {
+      transition: background .18s ease;
+    }
+
+    .rt-table tbody tr:hover {
+      background: rgba(207,7,34,.03);
+    }
+
+    .rt-table td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .rt-file {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .rt-file-badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--red);
+      flex-shrink: 0;
+    }
+
+    .rt-file-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .rt-file-meta,
+    .rt-user-meta,
+    .rt-date-meta {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .rt-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rt-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .rt-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+
+    .rt-status.sent {
+      background: rgba(26,122,74,.10);
+      color: var(--green);
+      border-color: rgba(26,122,74,.18);
+    }
+
+    .rt-status.opened {
+      background: rgba(0,61,110,.10);
+      color: var(--blue);
+      border-color: rgba(0,61,110,.16);
+    }
+
+    .rt-status.expiring {
+      background: rgba(240,178,31,.12);
+      color: #916300;
+      border-color: rgba(240,178,31,.22);
+    }
+
+    .rt-status.expired {
+      background: rgba(207,7,34,.08);
+      color: var(--red);
+      border-color: rgba(207,7,34,.14);
+    }
+
+    .rt-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .rt-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .rt-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .rt-btn.primary {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+    }
+
+    .rt-btn.primary:hover {
+      background: var(--red-light);
+      border-color: var(--red-light);
+      color: #fff;
+    }
+
+    .rt-side-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .rt-mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .rt-mini-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: linear-gradient(180deg, var(--surface), rgba(0,0,0,0));
+    }
+
+    .rt-mini-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .rt-mini-sub {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .rt-metric {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .rt-metric-value {
+      font-family: var(--serif);
+      font-size: 28px;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+
+    .activity-log-page {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .al-hero {
+      background: #111315;
+      border-radius: 18px;
+      padding: 28px;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .al-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 72% 60% at 18% 18%, rgba(204,0,0,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 78% at 82% 82%, rgba(0,61,110,.16) 0%, transparent 52%),
+        radial-gradient(ellipse 40% 50% at 68% 22%, rgba(245,168,0,.08) 0%, transparent 58%);
+    }
+
+    .al-hero-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 18px;
+    }
+
+    .al-kicker {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.55);
+      margin-bottom: 10px;
+    }
+
+    .al-hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(30px, 4vw, 48px);
+      font-weight: 400;
+      line-height: .98;
+      letter-spacing: -.03em;
+      margin-bottom: 10px;
+    }
+
+    .al-hero p {
+      max-width: 620px;
+      color: rgba(255,255,255,.68);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .al-live-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.08);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .al-live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(61,214,140,.12);
+    }
+
+    .al-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .al-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .al-stat::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .al-stat.red::after { background: var(--red); }
+    .al-stat.gold::after { background: var(--gold); }
+    .al-stat.blue::after { background: var(--blue); }
+    .al-stat.green::after { background: var(--green); }
+
+    .al-stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .al-stat-value {
+      font-family: var(--serif);
+      font-size: 34px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .al-stat-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .al-layout {
+      display: grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap: 20px;
+    }
+
+    .al-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .al-search,
+    .al-filter {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 10px;
+      font: inherit;
+      outline: none;
+      transition: .18s ease;
+      height: 42px;
+    }
+
+    .al-search:focus,
+    .al-filter:focus {
+      border-color: var(--red);
+    }
+
+    .al-search {
+      flex: 1 1 260px;
+      min-width: 220px;
+      padding: 0 14px;
+    }
+
+    .al-filter {
+      min-width: 160px;
+      padding: 0 12px;
+    }
+
+    .activity-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .activity-item {
+      position: relative;
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 14px;
+      padding-left: 4px;
+    }
+
+    .activity-line {
+      position: absolute;
+      left: 15px;
+      top: 34px;
+      bottom: -18px;
+      width: 1px;
+      background: var(--border);
+    }
+
+    .activity-item:last-child .activity-line {
+      display: none;
+    }
+
+    .activity-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      position: relative;
+      z-index: 1;
+      margin-top: 4px;
+      box-shadow: 0 0 0 6px var(--surface);
+    }
+
+    .activity-icon.info {
+      background: rgba(0,61,110,.10);
+      color: var(--blue);
+      border: 1px solid rgba(0,61,110,.16);
+    }
+
+    .activity-icon.success {
+      background: rgba(26,122,74,.10);
+      color: var(--green);
+      border: 1px solid rgba(26,122,74,.18);
+    }
+
+    .activity-icon.warn {
+      background: rgba(240,178,31,.12);
+      color: #916300;
+      border: 1px solid rgba(240,178,31,.22);
+    }
+
+    .activity-icon.danger {
+      background: rgba(207,7,34,.08);
+      color: var(--red);
+      border: 1px solid rgba(207,7,34,.14);
+    }
+
+    .activity-content {
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--surface), rgba(0,0,0,0));
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .activity-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .activity-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .activity-meta {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .activity-desc {
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--ink2);
+    }
+
+    .activity-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .activity-badge.info {
+      background: rgba(0,61,110,.10);
+      color: var(--blue);
+      border-color: rgba(0,61,110,.16);
+    }
+
+    .activity-badge.success {
+      background: rgba(26,122,74,.10);
+      color: var(--green);
+      border-color: rgba(26,122,74,.18);
+    }
+
+    .activity-badge.warn {
+      background: rgba(240,178,31,.12);
+      color: #916300;
+      border-color: rgba(240,178,31,.22);
+    }
+
+    .activity-badge.danger {
+      background: rgba(207,7,34,.08);
+      color: var(--red);
+      border-color: rgba(207,7,34,.14);
+    }
+
+    .al-side-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .al-mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .al-mini-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: linear-gradient(180deg, var(--surface), rgba(0,0,0,0));
+    }
+
+    .al-mini-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .al-mini-sub {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .al-mini-tag {
+      height: fit-content;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+
+    .al-mini-tag.info {
+      background: rgba(0,61,110,.10);
+      color: var(--blue);
+    }
+
+    .al-mini-tag.warn {
+      background: rgba(240,178,31,.12);
+      color: #916300;
+    }
+
+    .al-mini-tag.danger {
+      background: rgba(207,7,34,.08);
+      color: var(--red);
+    }
+
+    .al-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .al-break-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .al-break-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      background: var(--ink);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      box-shadow: var(--shadow-lg);
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: .25s ease;
+      z-index: 99;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1100px) {
+      .layout,
+      .rt-layout,
+      .al-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    @media (max-width: 720px) {
+      .content { padding: 18px; }
+      .hero { padding: 24px; }
+      .hero-inner,
+      .rt-hero-inner,
+      .al-hero-inner,
+      .activity-top {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .form-grid { grid-template-columns: 1fr; }
+      .link-row { flex-direction: column; }
+      .secondary-btn { width: 100%; }
+
+      .rt-table thead {
+        display: none;
+      }
+
+      .rt-table,
+      .rt-table tbody,
+      .rt-table tr,
+      .rt-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .rt-table tr {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .rt-table td {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        border-bottom: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-mark">
+          <div class="icon">📁</div>
+          <div>
+            <div class="sidebar-wordmark">NoRedundancy</div>
+            <div class="sidebar-sub">Secure file sharing</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Workspace</div>
+        <button class="nav-item active" onclick="showPage('file-share', this)">
+          <span>↗</span> File Share
+          <span class="nav-badge">Live</span>
+        </button>
+        <button class="nav-item" onclick="showPage('recent-transfers', this)">
+          <span>◌</span> Recent Transfers
+        </button>
+        <button class="nav-item" onclick="showPage('activity-log', this)">
+          <span>◌</span> Activity Log
+        </button>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="user-chip">
+          <div class="user-avatar">NR</div>
+          <div>
+            <div class="user-name">Team Workspace</div>
+            <div class="user-email">share@noredundancy.app</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="topbar">
+        <div class="topbar-title" id="topbar-title">File Share</div>
+        <div class="topbar-actions">
+          <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">🌙 Dark mode</button>
+          <div class="ai-badge">✦ Transfer workspace</div>
+        </div>
+      </div>
+
+      <div class="content">
+        <section class="page-panel active" id="page-file-share">
+          <section class="hero">
+            <div class="hero-inner">
+              <div>
+                <h1>Share files<br>without the clutter.</h1>
+                <p>Create direct share links, manage expiry, and keep transfers clean without the old code-based mess.</p>
+              </div>
+              <div class="hero-meta">Secure file sharing workspace</div>
+            </div>
+          </section>
+
+          <div class="dashboard-grid">
+            <div class="stat-card red">
+              <div class="stat-label">Files queued</div>
+              <div class="stat-value" id="stat-files">0</div>
+              <div class="stat-sub">Ready to send</div>
+            </div>
+            <div class="stat-card gold">
+              <div class="stat-label">Transfers created</div>
+              <div class="stat-value" id="stat-transfers">0</div>
+              <div class="stat-sub">Generated links</div>
+            </div>
+            <div class="stat-card blue">
+              <div class="stat-label">Total size moved</div>
+              <div class="stat-value" id="stat-size">0 B</div>
+              <div class="stat-sub">Across all shares</div>
+            </div>
+          </div>
+
+          <div class="layout">
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">📤 Create share</div>
+              </div>
+              <div class="card-body">
+                <div class="drop-zone" id="drop-zone">
+                  <div class="drop-icon">↥</div>
+                  <div class="drop-title">Drag files here</div>
+                  <div class="drop-sub">or choose files manually</div>
+                  <input id="file-input" type="file" multiple hidden />
+                  <button class="secondary-btn" onclick="document.getElementById('file-input').click()">Browse files</button>
+                </div>
+
+                <div class="file-queue" id="file-queue"></div>
+
+                <div class="form-grid" id="share-settings" style="display:none;">
+                  <div class="form-field">
+                    <label for="expiry">Link expiry</label>
+                    <select id="expiry">
+                      <option value="12">12 hours</option>
+                      <option value="24" selected>24 hours</option>
+                      <option value="48">48 hours</option>
+                      <option value="72">72 hours</option>
+                    </select>
+                  </div>
+
+                  <div class="form-field">
+                    <label for="max-dl">Max downloads</label>
+                    <input id="max-dl" type="number" min="1" value="5" />
+                  </div>
+
+                  <div class="form-field full">
+                    <label for="note">Share note</label>
+                    <textarea id="note" placeholder="Optional note for the recipient"></textarea>
+                  </div>
+                </div>
+
+                <button class="primary-btn" id="generate-btn" style="display:none;" onclick="generateShare()">Generate share link</button>
+
+                <div class="result-box" id="share-result">
+                  <div class="result-head">Share link ready</div>
+                  <div class="link-row">
+                    <div class="share-link" id="share-link-display"></div>
+                    <button class="secondary-btn" id="copy-btn" onclick="copyLink()">Copy link</button>
+                  </div>
+                  <div class="helper" id="share-meta-text"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <div class="card-title">📥 Shared files</div>
+              </div>
+              <div class="card-body">
+                <div class="share-list" id="share-list"></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="page-panel" id="page-recent-transfers">
+          <div class="recent-transfers-page">
+            <section class="rt-hero">
+              <div class="rt-hero-inner">
+                <div>
+                  <div class="rt-kicker">Transfer intelligence</div>
+                  <h1>Recent transfers</h1>
+                  <p>Track every file handoff, see what got opened, and catch links that are about to die before someone pings you saying the download is broken.</p>
+                </div>
+                <div class="rt-live-chip">
+                  <span class="rt-live-dot"></span>
+                  Live session activity
+                </div>
+              </div>
+            </section>
+
+            <section class="rt-stats">
+              <div class="rt-stat red">
+                <div class="rt-stat-label">Transfers today</div>
+                <div class="rt-stat-value" id="rt-transfers-today">24</div>
+                <div class="rt-stat-sub">6 more than yesterday</div>
+              </div>
+
+              <div class="rt-stat gold">
+                <div class="rt-stat-label">Pending expiry</div>
+                <div class="rt-stat-value" id="rt-pending-expiry">5</div>
+                <div class="rt-stat-sub">Need attention in the next 12h</div>
+              </div>
+
+              <div class="rt-stat blue">
+                <div class="rt-stat-label">Open rate</div>
+                <div class="rt-stat-value" id="rt-open-rate">78%</div>
+                <div class="rt-stat-sub">Recipients are actually using the links</div>
+              </div>
+
+              <div class="rt-stat green">
+                <div class="rt-stat-label">Data moved</div>
+                <div class="rt-stat-value" id="rt-data-moved">18.4 GB</div>
+                <div class="rt-stat-sub">Across the last 7 days</div>
+              </div>
+            </section>
+
+            <div class="rt-layout">
+              <section class="card">
+                <div class="card-header">
+                  <div class="card-title">↗ Transfer history</div>
+                  <div class="rt-toolbar">
+                    <input class="rt-search" id="rt-search" type="text" placeholder="Search file, recipient, or note" />
+                    <select class="rt-filter" id="rt-filter">
+                      <option value="all">All statuses</option>
+                      <option value="opened">Opened</option>
+                      <option value="sent">Sent</option>
+                      <option value="expiring">Expiring</option>
+                      <option value="expired">Expired</option>
+                    </select>
+                    <select class="rt-sort" id="rt-sort">
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                      <option value="largest">Largest first</option>
+                      <option value="most-opened">Most opened</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="card-body" style="padding:0;">
+                  <div class="rt-table-wrap">
+                    <table class="rt-table">
+                      <thead>
+                        <tr>
+                          <th>Transfer</th>
+                          <th>Recipient</th>
+                          <th>Status</th>
+                          <th>When</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="rt-table-body">
+                        <tr>
+                          <td>
+                            <div class="rt-file">
+                              <div class="rt-file-badge">PDF</div>
+                              <div>
+                                <div class="rt-file-name">Capstone_Final_Report.pdf</div>
+                                <div class="rt-file-meta">4.2 MB • 1 file • final submission package</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="rt-user">
+                              <div class="rt-avatar">ML</div>
+                              <div>
+                                <div class="rt-file-name">Maria Lee</div>
+                                <div class="rt-user-meta">maria.lee@ucalgary.ca</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><span class="rt-status opened">Opened 3 times</span></td>
+                          <td>
+                            <div class="rt-date-meta">Today, 2:14 PM</div>
+                            <div class="rt-date-meta">Expires in 18h</div>
+                          </td>
+                          <td>
+                            <div class="rt-actions">
+                              <button class="rt-btn">Copy link</button>
+                              <button class="rt-btn">Extend</button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td>
+                            <div class="rt-file">
+                              <div class="rt-file-badge">ZIP</div>
+                              <div>
+                                <div class="rt-file-name">UI_Assets_Review.zip</div>
+                                <div class="rt-file-meta">812 MB • 14 files • design handoff</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="rt-user">
+                              <div class="rt-avatar" style="background:var(--blue);">AR</div>
+                              <div>
+                                <div class="rt-file-name">Alex Raman</div>
+                                <div class="rt-user-meta">alex.r@ucalgary.ca</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><span class="rt-status sent">Sent</span></td>
+                          <td>
+                            <div class="rt-date-meta">Today, 11:08 AM</div>
+                            <div class="rt-date-meta">Expires in 46h</div>
+                          </td>
+                          <td>
+                            <div class="rt-actions">
+                              <button class="rt-btn primary">Resend</button>
+                              <button class="rt-btn">Details</button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td>
+                            <div class="rt-file">
+                              <div class="rt-file-badge">DOCX</div>
+                              <div>
+                                <div class="rt-file-name">Meeting_Notes_TA.docx</div>
+                                <div class="rt-file-meta">284 KB • 1 file • feedback summary</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="rt-user">
+                              <div class="rt-avatar" style="background:var(--gold);color:#362700;">SK</div>
+                              <div>
+                                <div class="rt-file-name">Sam Khan</div>
+                                <div class="rt-user-meta">sam.khan@ucalgary.ca</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><span class="rt-status expiring">Expiring soon</span></td>
+                          <td>
+                            <div class="rt-date-meta">Yesterday, 7:42 PM</div>
+                            <div class="rt-date-meta">Expires in 2h</div>
+                          </td>
+                          <td>
+                            <div class="rt-actions">
+                              <button class="rt-btn primary">Extend</button>
+                              <button class="rt-btn">Copy link</button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td>
+                            <div class="rt-file">
+                              <div class="rt-file-badge">PPT</div>
+                              <div>
+                                <div class="rt-file-name">Midterm_Presentation_v3.pptx</div>
+                                <div class="rt-file-meta">19.6 MB • 1 file • committee deck</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="rt-user">
+                              <div class="rt-avatar" style="background:#7a4ab5;">JH</div>
+                              <div>
+                                <div class="rt-file-name">Jayden Hall</div>
+                                <div class="rt-user-meta">jayden.h@ucalgary.ca</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><span class="rt-status expired">Expired</span></td>
+                          <td>
+                            <div class="rt-date-meta">Mar 25, 9:16 AM</div>
+                            <div class="rt-date-meta">Expired 6h ago</div>
+                          </td>
+                          <td>
+                            <div class="rt-actions">
+                              <button class="rt-btn primary">Generate new link</button>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="rt-side-stack">
+                <section class="card">
+                  <div class="card-header">
+                    <div class="card-title">⚠ Needs attention</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="rt-mini-list">
+                      <div class="rt-mini-item">
+                        <div>
+                          <div class="rt-mini-title">Meeting_Notes_TA.docx</div>
+                          <div class="rt-mini-sub">Recipient has not opened the link and it dies in 2 hours.</div>
+                        </div>
+                        <div class="rt-metric">
+                          <div class="rt-metric-value">2h</div>
+                          <div class="rt-mini-sub">left</div>
+                        </div>
+                      </div>
+
+                      <div class="rt-mini-item">
+                        <div>
+                          <div class="rt-mini-title">Midterm_Presentation_v3.pptx</div>
+                          <div class="rt-mini-sub">Expired. If they still need it, resend now.</div>
+                        </div>
+                        <div class="rt-metric">
+                          <div class="rt-metric-value">0</div>
+                          <div class="rt-mini-sub">active links</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <div class="card-header">
+                    <div class="card-title">📊 Quick breakdown</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="rt-mini-list">
+                      <div class="rt-mini-item">
+                        <div>
+                          <div class="rt-mini-title">Opened links</div>
+                          <div class="rt-mini-sub">Transfers that were clicked at least once.</div>
+                        </div>
+                        <div class="rt-metric">
+                          <div class="rt-metric-value">14</div>
+                          <div class="rt-mini-sub">of 18</div>
+                        </div>
+                      </div>
+
+                      <div class="rt-mini-item">
+                        <div>
+                          <div class="rt-mini-title">Largest transfer</div>
+                          <div class="rt-mini-sub">UI_Assets_Review.zip moved the most data this week.</div>
+                        </div>
+                        <div class="rt-metric">
+                          <div class="rt-metric-value">812</div>
+                          <div class="rt-mini-sub">MB</div>
+                        </div>
+                      </div>
+
+                      <div class="rt-mini-item">
+                        <div>
+                          <div class="rt-mini-title">Average time to open</div>
+                          <div class="rt-mini-sub">How fast recipients actually respond after receiving a link.</div>
+                        </div>
+                        <div class="rt-metric">
+                          <div class="rt-metric-value">38m</div>
+                          <div class="rt-mini-sub">avg</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section class="page-panel" id="page-activity-log">
+          <div class="activity-log-page">
+            <section class="al-hero">
+              <div class="al-hero-inner">
+                <div>
+                  <div class="al-kicker">Workspace monitoring</div>
+                  <h1>Activity Log</h1>
+                  <p>Track meaningful actions across uploads, transfers, and access. This is where you catch what happened, who touched what, and whether it matters.</p>
+                </div>
+                <div class="al-live-chip">
+                  <span class="al-live-dot"></span>
+                  Live audit trail
+                </div>
+              </div>
+            </section>
+
+            <section class="al-stats">
+              <div class="al-stat red"><div class="al-stat-label">Events today</div><div class="al-stat-value">146</div><div class="al-stat-sub">Across uploads, opens, and shares</div></div>
+              <div class="al-stat gold"><div class="al-stat-label">Flagged</div><div class="al-stat-value">7</div><div class="al-stat-sub">Need review or follow-up</div></div>
+              <div class="al-stat blue"><div class="al-stat-label">Users active</div><div class="al-stat-value">19</div><div class="al-stat-sub">Touched the workspace today</div></div>
+              <div class="al-stat green"><div class="al-stat-label">Blocked attempts</div><div class="al-stat-value">8</div><div class="al-stat-sub">Stopped before access</div></div>
+            </section>
+
+            <div class="al-layout">
+              <section class="card">
+                <div class="card-header">
+                  <div class="card-title">🕘 Timeline</div>
+                  <div class="al-toolbar">
+                    <input class="al-search" type="text" placeholder="Search file, user, or action" />
+                    <select class="al-filter"><option>All events</option><option>Uploads</option><option>Shares</option><option>Opens</option><option>Expired links</option><option>Failed access</option></select>
+                    <select class="al-filter"><option>All severity</option><option>Info</option><option>Warning</option><option>Critical</option></select>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <div class="activity-timeline">
+                    <div class="activity-item">
+                      <div class="activity-icon info">↗</div>
+                      <div class="activity-content">
+                        <div class="activity-top">
+                          <div>
+                            <div class="activity-title">Share link created</div>
+                            <div class="activity-meta">Maria Lee • Capstone_Final_Report.pdf • 2:14 PM</div>
+                          </div>
+                          <span class="activity-badge info">Info</span>
+                        </div>
+                        <div class="activity-desc">Created link for the capstone report.</div>
+                      </div>
+                    </div>
+
+                    <div class="activity-item">
+                      <div class="activity-icon success">↓</div>
+                      <div class="activity-content">
+                        <div class="activity-top">
+                          <div>
+                            <div class="activity-title">File opened</div>
+                            <div class="activity-meta">Alex Raman • UI_Assets_Review.zip • 11:31 AM</div>
+                          </div>
+                          <span class="activity-badge success">Opened</span>
+                        </div>
+                        <div class="activity-desc">UI assets file accessed successfully.</div>
+                      </div>
+                    </div>
+
+                    <div class="activity-item">
+                      <div class="activity-icon warn">!</div>
+                      <div class="activity-content">
+                        <div class="activity-top">
+                          <div>
+                            <div class="activity-title">Link expiring soon</div>
+                            <div class="activity-meta">Sam Khan • Meeting_Notes_TA.docx • 9:42 AM</div>
+                          </div>
+                          <span class="activity-badge warn">Warning</span>
+                        </div>
+                        <div class="activity-desc">File not opened yet. Expires in 2 hours.</div>
+                      </div>
+                    </div>
+
+                    <div class="activity-item">
+                      <div class="activity-icon danger">×</div>
+                      <div class="activity-content">
+                        <div class="activity-top">
+                          <div>
+                            <div class="activity-title">Failed access</div>
+                            <div class="activity-meta">Unknown • Midterm_Presentation_v3.pptx • 8:07 AM</div>
+                          </div>
+                          <span class="activity-badge danger">Critical</span>
+                        </div>
+                        <div class="activity-desc">Attempted to access expired link.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="al-side-stack">
+                <section class="card">
+                  <div class="card-header">
+                    <div class="card-title">⚠ Flagged Activity</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="al-mini-list">
+                      <div class="al-mini-item">
+                        <div>
+                          <div class="al-mini-title">Expired link access</div>
+                          <div class="al-mini-sub">Midterm_Presentation_v3.pptx was requested after expiry.</div>
+                        </div>
+                        <span class="al-mini-tag danger">Critical</span>
+                      </div>
+                      <div class="al-mini-item">
+                        <div>
+                          <div class="al-mini-title">Not opened before expiry</div>
+                          <div class="al-mini-sub">Meeting_Notes_TA.docx still has no recipient activity.</div>
+                        </div>
+                        <span class="al-mini-tag warn">Review</span>
+                      </div>
+                      <div class="al-mini-item">
+                        <div>
+                          <div class="al-mini-title">Multiple opens</div>
+                          <div class="al-mini-sub">Capstone_Final_Report.pdf has been opened 3 times today.</div>
+                        </div>
+                        <span class="al-mini-tag info">Track</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <div class="card-header">
+                    <div class="card-title">📌 Event Breakdown</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="al-breakdown">
+                      <div class="al-break-row"><span>Uploads</span><strong>28</strong></div>
+                      <div class="al-break-row"><span>Shares</span><strong>24</strong></div>
+                      <div class="al-break-row"><span>Opens</span><strong>67</strong></div>
+                      <div class="al-break-row"><span>Expiries</span><strong>19</strong></div>
+                      <div class="al-break-row"><span>Blocked</span><strong>8</strong></div>
+                    </div>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let files = [];
+    let shares = [];
+    let totalTransfers = 0;
+    let totalBytes = 0;
+    let latestShareLink = '';
+
+    const dz = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    dz.addEventListener('click', (e) => {
+      const clickedButton = e.target.closest('button');
+      if (!clickedButton) fileInput.click();
+    });
+
+    dz.addEventListener('dragover', e => {
+      e.preventDefault();
+      dz.classList.add('dragover');
+    });
+
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      dz.classList.remove('dragover');
+      addFiles([...e.dataTransfer.files]);
+    });
+
+    fileInput.addEventListener('change', e => {
+      addFiles([...e.target.files]);
+      e.target.value = '';
+    });
+
+    function showPage(page, btn) {
+      document.querySelectorAll('.page-panel').forEach(panel => panel.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+
+      const target = document.getElementById(`page-${page}`);
+      if (target) target.classList.add('active');
+      if (btn) btn.classList.add('active');
+
+      const titles = {
+        'file-share': 'File Share',
+        'recent-transfers': 'Recent Transfers',
+        'activity-log': 'Activity Log'
+      };
+
+      const titleEl = document.getElementById('topbar-title');
+      if (titleEl) titleEl.textContent = titles[page] || 'Workspace';
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark-mode');
+      const btn = document.getElementById('theme-toggle');
+      const dark = document.body.classList.contains('dark-mode');
+      btn.textContent = dark ? '☀️ Light mode' : '🌙 Dark mode';
+      localStorage.setItem('nr-theme', dark ? 'dark' : 'light');
+    }
+
+    (function loadTheme() {
+      const saved = localStorage.getItem('nr-theme');
+      if (saved === 'dark') {
+        document.body.classList.add('dark-mode');
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.textContent = '☀️ Light mode';
+      }
+    })();
+
+    function addFiles(newFiles) {
+      newFiles.forEach(file => {
+        const exists = files.some(item => item.name === file.name && item.size === file.size);
+        if (!exists) files.push(file);
+      });
+
+      renderQueue();
+      syncControls();
+    }
+
+    function removeFile(index) {
+      files.splice(index, 1);
+      renderQueue();
+      syncControls();
+    }
+
+    function syncControls() {
+      const hasFiles = files.length > 0;
+      document.getElementById('share-settings').style.display = hasFiles ? '' : 'none';
+      document.getElementById('generate-btn').style.display = hasFiles ? '' : 'none';
+      document.getElementById('share-result').style.display = 'none';
+      document.getElementById('stat-files').textContent = files.length;
+    }
+
+    function renderQueue() {
+      const queue = document.getElementById('file-queue');
+
+      if (!files.length) {
+        queue.innerHTML = '';
+        return;
+      }
+
+      queue.innerHTML = files.map((file, index) => `
+        <div class="file-row">
+          <div class="file-row-left">
+            <div class="file-badge">${getExtension(file.name)}</div>
+            <div>
+              <div class="file-name">${escapeHtml(file.name)}</div>
+              <div class="file-meta">${formatBytes(file.size)}</div>
+            </div>
+          </div>
+          <button class="file-remove" onclick="removeFile(${index})" aria-label="Remove file">×</button>
+        </div>
+      `).join('');
+    }
+
+    function generateShare() {
+      if (!files.length) return;
+
+      const expiry = Number(document.getElementById('expiry').value);
+      const maxDl = Number(document.getElementById('max-dl').value) || 1;
+      const note = document.getElementById('note').value.trim();
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      const firstName = files[0].name;
+      const id = Math.random().toString(36).slice(2, 10);
+      const link = `https://noredundancy.app/share/${id}`;
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + expiry * 60 * 60 * 1000);
+
+      const share = {
+        id,
+        link,
+        note,
+        expiry,
+        maxDl,
+        files: files.map(file => ({
+          name: file.name,
+          size: file.size
+        })),
+        totalSize,
+        createdAt,
+        expiresAt,
+        status: expiry <= 12 ? 'expiring' : 'active'
+      };
+
+      shares.unshift(share);
+      latestShareLink = link;
+      totalTransfers += 1;
+      totalBytes += totalSize;
+
+      document.getElementById('share-link-display').textContent = link;
+      document.getElementById('share-meta-text').textContent =
+        `${files.length} file${files.length > 1 ? 's' : ''} • ${formatBytes(totalSize)} • expires in ${expiry}h • max ${maxDl} download${maxDl > 1 ? 's' : ''}${note ? ' • note added' : ''}`;
+
+      document.getElementById('share-result').style.display = 'block';
+
+      files = [];
+      document.getElementById('note').value = '';
+      document.getElementById('max-dl').value = '5';
+      document.getElementById('expiry').value = '24';
+
+      renderQueue();
+      syncControls();
+      renderShares();
+      updateStats();
+      showToast('Share link generated.');
+    }
+
+    function renderShares() {
+      const list = document.getElementById('share-list');
+
+      if (!shares.length) {
+        list.innerHTML = `<div class="empty-state">No shares yet. Generate a link and it will show up here.</div>`;
+        return;
+      }
+
+      list.innerHTML = shares.map((share, index) => {
+        const names = share.files.map(file => file.name).join(', ');
+        const label = share.status === 'expiring' ? 'Expiring soon' : 'Active';
+        const cls = share.status === 'expiring' ? 'expiring' : 'active';
+
+        return `
+          <div class="share-item">
+            <div class="share-head">
+              <div>
+                <div class="share-title">${escapeHtml(share.files[0].name)}${share.files.length > 1 ? ` +${share.files.length - 1}` : ''}</div>
+                <div class="share-sub">${share.files.length} file${share.files.length > 1 ? 's' : ''} • ${formatBytes(share.totalSize)} • expires ${timeUntil(share.expiresAt)}${share.note ? ` • ${escapeHtml(share.note)}` : ''}</div>
+              </div>
+              <span class="share-pill ${cls}">${label}</span>
+            </div>
+
+            <div class="share-sub" style="margin-bottom:8px;">${escapeHtml(names)}</div>
+            <div class="share-sub" style="font-family:var(--mono); word-break:break-all;">${share.link}</div>
+
+            <div class="share-actions">
+              <button class="mini-btn" onclick="copySpecificLink('${share.link}')">Copy link</button>
+              <button class="mini-btn" onclick="extendShare(${index})">Extend 24h</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function copyLink() {
+      if (!latestShareLink) return;
+      navigator.clipboard.writeText(latestShareLink)
+        .then(() => showToast('Link copied.'))
+        .catch(() => showToast('Could not copy link.'));
+    }
+
+    function copySpecificLink(link) {
+      navigator.clipboard.writeText(link)
+        .then(() => showToast('Link copied.'))
+        .catch(() => showToast('Could not copy link.'));
+    }
+
+    function extendShare(index) {
+      if (!shares[index]) return;
+      shares[index].expiresAt = new Date(shares[index].expiresAt.getTime() + 24 * 60 * 60 * 1000);
+      shares[index].status = 'active';
+      renderShares();
+      showToast('Share extended by 24 hours.');
+    }
+
+    function updateStats() {
+      document.getElementById('stat-files').textContent = files.length;
+      document.getElementById('stat-transfers').textContent = totalTransfers;
+      document.getElementById('stat-size').textContent = formatBytes(totalBytes);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function getExtension(filename) {
+      const parts = filename.split('.');
+      return parts.length > 1 ? parts.pop().slice(0, 4).toUpperCase() : 'FILE';
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${units[i]}`;
+    }
+
+    function timeUntil(date) {
+      const diff = new Date(date).getTime() - Date.now();
+      if (diff <= 0) return 'has expired';
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      if (hours < 1) {
+        const mins = Math.max(1, Math.floor(diff / (1000 * 60)));
+        return `in ${mins}m`;
+      }
+      if (hours < 24) return `in ${hours}h`;
+
+      const days = Math.floor(hours / 24);
+      return `in ${days}d`;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    renderShares();
+    updateStats();
+  </script>
+</body>
+</html>
