@@ -115,6 +115,39 @@ export function FileShareDashboard({
     return () => window.removeEventListener('keydown', onKey)
   }, [deleteConfirm, deletingId])
 
+  useEffect(() => {
+    const supabase = supabaseBrowser
+    if (!supabase) return
+
+    let debounce: ReturnType<typeof setTimeout> | undefined
+    const scheduleRefresh = () => {
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => {
+        router.refresh()
+        debounce = undefined
+      }, 120)
+    }
+
+    const channel = supabase
+      .channel('workspace-uploads-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'uploads' },
+        scheduleRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'upload_files' },
+        scheduleRefresh,
+      )
+      .subscribe()
+
+    return () => {
+      if (debounce) clearTimeout(debounce)
+      void supabase.removeChannel(channel)
+    }
+  }, [router])
+
   const addFiles = (newFiles: File[]) => {
     const allowed: File[] = []
     let skipped = 0
