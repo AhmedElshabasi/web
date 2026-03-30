@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 
 export type UploadFileRow = {
@@ -18,6 +18,13 @@ export type UploadPackageRow = {
   note: string | null
   created_at: string | null
   upload_files: UploadFileRow[] | null
+}
+
+type DeleteConfirmTarget = {
+  uploadId: string
+  fileId: string
+  storagePath: string
+  originalName: string
 }
 
 function ext(name: string) {
@@ -90,6 +97,7 @@ export function FileShareDashboard({
   const [lastBatchMeta, setLastBatchMeta] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmTarget | null>(null)
 
   const queueBytes = useMemo(() => queue.reduce((a, f) => a + f.size, 0), [queue])
 
@@ -97,6 +105,15 @@ export function FileShareDashboard({
     setToast(message)
     window.setTimeout(() => setToast(null), 2200)
   }, [])
+
+  useEffect(() => {
+    if (!deleteConfirm) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !deletingId) setDeleteConfirm(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [deleteConfirm, deletingId])
 
   const addFiles = (newFiles: File[]) => {
     const allowed: File[] = []
@@ -201,42 +218,42 @@ export function FileShareDashboard({
     }
   }
 
-  const deleteSharedFile = async (
-    uploadId: string,
-    fileId: string,
-    storagePath: string,
-    originalName: string,
-  ) => {
+  const runDeleteSharedFile = async (target: DeleteConfirmTarget) => {
     if (!supabaseBrowser) {
       showToast('Supabase is not configured.')
       return
     }
-    if (
-      !window.confirm(
-        `Delete “${originalName}”? This removes the file from storage and cannot be undone.`,
-      )
-    ) {
-      return
-    }
-    setDeletingId(fileId)
+    setDeletingId(target.fileId)
     try {
-      const { error: storageErr } = await supabaseBrowser.storage.from('uploads').remove([storagePath])
+      const { error: storageErr } = await supabaseBrowser.storage.from('uploads').remove([target.storagePath])
       if (storageErr) {
         console.warn('[uploads] storage remove:', storageErr.message)
       }
-      const { error: fileErr } = await supabaseBrowser.from('upload_files').delete().eq('id', fileId)
+
+      const { data: deletedRows, error: fileErr } = await supabaseBrowser
+        .from('upload_files')
+        .delete()
+        .eq('id', target.fileId)
+        .select('id')
+
       if (fileErr) throw fileErr
+      if (!deletedRows?.length) {
+        throw new Error(
+          'Delete did not remove any row. If you own this file, re-run supabase/migrations/003_uploads_delete_policies.sql in the SQL editor.',
+        )
+      }
 
       const { data: remaining } = await supabaseBrowser
         .from('upload_files')
         .select('id')
-        .eq('upload_id', uploadId)
+        .eq('upload_id', target.uploadId)
         .limit(1)
       if (!remaining?.length) {
-        const { error: uploadErr } = await supabaseBrowser.from('uploads').delete().eq('id', uploadId)
+        const { error: uploadErr } = await supabaseBrowser.from('uploads').delete().eq('id', target.uploadId)
         if (uploadErr) console.warn('[uploads] delete package:', uploadErr.message)
       }
 
+      setDeleteConfirm(null)
       showToast('File deleted.')
       router.refresh()
     } catch (e: unknown) {
@@ -295,7 +312,14 @@ export function FileShareDashboard({
                         className="file-remove share-file-delete"
                         disabled={deletingId === f.id}
                         aria-label={`Delete ${f.original_name}`}
-                        onClick={() => void deleteSharedFile(u.id, f.id, f.storage_path, f.original_name)}
+                        onClick={() =>
+                          setDeleteConfirm({
+                            uploadId: u.id,
+                            fileId: f.id,
+                            storagePath: f.storage_path,
+                            originalName: f.original_name,
+                          })
+                        }
                       >
                         ×
                       </button>
@@ -311,6 +335,43 @@ export function FileShareDashboard({
 
   return (
     <>
+      {deleteConfirm ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-dialog-title" className="confirm-dialog-title">
+              Delete this file?
+            </h2>
+            <p className="confirm-dialog-body">
+              <strong>{deleteConfirm.originalName}</strong> will be removed from storage and the database. This
+              cannot be undone.
+            </p>
+            <div className="confirm-dialog-actions">
+              <button type="button" className="secondary-btn" onClick={() => setDeleteConfirm(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm-dialog-delete"
+                disabled={deletingId === deleteConfirm.fileId}
+                onClick={() => void runDeleteSharedFile(deleteConfirm)}
+              >
+                {deletingId === deleteConfirm.fileId ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="hero">
         <div className="hero-inner">
           <div>

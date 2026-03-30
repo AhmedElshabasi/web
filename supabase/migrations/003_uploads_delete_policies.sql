@@ -1,16 +1,18 @@
 -- Allow users to delete their own upload_files rows and parent uploads when empty.
 -- Allow deleting matching objects in storage bucket "uploads" (path demo/<user_id>/...).
+--
+-- NOTE: If you already ran an older version, run this whole script again (DROP/CREATE is idempotent).
 
+-- Prefer IN (subquery): unqualified upload_id in EXISTS can fail to bind to the row under RLS.
 drop policy if exists "upload_files_delete_own" on public.upload_files;
 create policy "upload_files_delete_own"
   on public.upload_files for delete
   to authenticated
   using (
-    exists (
-      select 1
+    upload_id in (
+      select u.id
       from public.uploads u
-      where u.id = upload_id
-        and u.user_id = auth.uid()
+      where u.user_id = auth.uid()
     )
   );
 
