@@ -119,13 +119,28 @@ export function FileShareDashboard({
     const supabase = supabaseBrowser
     if (!supabase) return
 
-    let debounce: ReturnType<typeof setTimeout> | undefined
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined
+    let followUpTimer: ReturnType<typeof setTimeout> | undefined
+
+    const clearTimers = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (followUpTimer) clearTimeout(followUpTimer)
+      debounceTimer = undefined
+      followUpTimer = undefined
+    }
+
+    // Uploads commit in two steps (uploads row, then storage + upload_files). A single refresh right after
+    // the first INSERT often loads nested upload_files as []. Deletes are one step, so they worked before.
     const scheduleRefresh = () => {
-      if (debounce) clearTimeout(debounce)
-      debounce = setTimeout(() => {
+      clearTimers()
+      debounceTimer = setTimeout(() => {
         router.refresh()
-        debounce = undefined
-      }, 120)
+        debounceTimer = undefined
+        followUpTimer = setTimeout(() => {
+          router.refresh()
+          followUpTimer = undefined
+        }, 550)
+      }, 220)
     }
 
     const channel = supabase
@@ -143,7 +158,7 @@ export function FileShareDashboard({
       .subscribe()
 
     return () => {
-      if (debounce) clearTimeout(debounce)
+      clearTimers()
       void supabase.removeChannel(channel)
     }
   }, [router])
@@ -244,6 +259,9 @@ export function FileShareDashboard({
       setShowResult(true)
       showToast('Upload complete.')
       router.refresh()
+      window.setTimeout(() => {
+        router.refresh()
+      }, 600)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Upload failed.')
     } finally {
