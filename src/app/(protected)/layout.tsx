@@ -98,7 +98,7 @@ export default async function ProtectedLayout({
         activeTeamId,
       }}
     >
-      <MainPageShell userEmail={user.email ?? null} fileShare={children} teams={teams} activeTeamId={activeTeamId} />
+      <MainPageShell userEmail={user.email ?? null} fileShare={children} />
     </UploadsWorkspaceProvider>
   )
 }
