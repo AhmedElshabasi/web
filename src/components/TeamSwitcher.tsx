@@ -1,25 +1,22 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
-import type { TeamRow } from '@/types/team'
+import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
 
-export function TeamSwitcher({
-  initialTeams,
-  initialActiveTeamId,
-}: {
-  initialTeams: TeamRow[]
-  initialActiveTeamId: string | null
-}) {
+export function TeamSwitcher() {
   const router = useRouter()
+  const { teams, activeTeamId, refreshTeams } = useUploadsWorkspace()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createName, setCreateName] = useState('')
   const [joinCode, setJoinCode] = useState('')
 
-  const teams = initialTeams
-  const activeTeamId = initialActiveTeamId
+  useEffect(() => {
+    // If the initial server render returned no teams, re-check membership once.
+    if (teams.length === 0) void refreshTeams()
+  }, [refreshTeams, teams.length])
 
   const activeTeam = useMemo(
     () => teams.find((t) => t.id === activeTeamId) ?? null,
@@ -36,12 +33,13 @@ export function TeamSwitcher({
           body: JSON.stringify({ teamId }),
         })
         if (!res.ok) throw new Error('Could not switch team')
+        await refreshTeams()
         router.refresh()
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Switch failed')
       }
     },
-    [router],
+    [refreshTeams, router],
   )
 
   const createTeam = async () => {
@@ -66,6 +64,7 @@ export function TeamSwitcher({
       })
       if (!res.ok) throw new Error('Could not set active team')
       setCreateName('')
+      await refreshTeams()
       router.refresh()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Create failed')
@@ -96,6 +95,7 @@ export function TeamSwitcher({
       })
       if (!res.ok) throw new Error('Could not set active team')
       setJoinCode('')
+      await refreshTeams()
       router.refresh()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Invalid code')
