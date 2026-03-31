@@ -117,18 +117,13 @@ create policy "teams_select_member"
     )
   );
 
+-- SELECT must NOT reference team_members again (Postgres: infinite recursion in policy).
 drop policy if exists "team_members_select_member" on public.team_members;
-create policy "team_members_select_member"
+drop policy if exists "team_members_select_own" on public.team_members;
+create policy "team_members_select_own"
   on public.team_members for select
   to authenticated
-  using (
-    exists (
-      select 1
-      from public.team_members tm
-      where tm.team_id = team_members.team_id
-        and tm.user_id = auth.uid()
-    )
-  );
+  using (user_id = auth.uid());
 
 -- No direct inserts into teams / team_members from clients (use RPC).
 

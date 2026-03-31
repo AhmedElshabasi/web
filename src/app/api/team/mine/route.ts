@@ -3,34 +3,56 @@ import { NextResponse } from 'next/server'
 import { supabaseServerClientOrNull } from '@/lib/supabaseServer'
 import type { TeamRow } from '@/types/team'
 
+/**
+ * Returns teams the current user belongs to + active team id (nr-team-id cookie).
+ * Uses two queries (memberships, then teams) so we do not rely on PostgREST embed naming.
+ */
 export async function GET() {
   const supabase = supabaseServerClientOrNull()
   if (!supabase) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   }
 
-  const { data } = await supabase.auth.getUser()
-  const user = data.user
+  const { data: userData, error: userErr } = await supabase.auth.getUser()
+  if (userErr) {
+    return NextResponse.json({ error: userErr.message }, { status: 500 })
+  }
+  const user = userData.user
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: membershipRows, error } = await supabase
+  const { data: memberships, error: memErr } = await supabase
     .from('team_members')
-    .select('role, teams(id, name, invite_code)')
+    .select('team_id, role')
     .eq('user_id', user.id)
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (memErr) {
+    return NextResponse.json({ error: memErr.message }, { status: 500 })
   }
 
-  const teams: TeamRow[] = (membershipRows ?? [])
-    .map((row: any) => {
-      const t = row.teams as TeamRow | TeamRow[] | null | undefined
-      const team = Array.isArray(t) ? t[0] : t
-      if (!team?.id) return null
-      const role = row.role === 'owner' || row.role === 'member' ? row.role : undefined
-      return { ...team, role } as TeamRow
+  const rows = memberships ?? []
+  if (rows.length === 0) {
+    return NextResponse.json({ teams: [] as TeamRow[], activeTeamId: null as string | null })
+  }
+
+  const teamIds = [...new Set(rows.map((r) => r.team_id).filter(Boolean))] as string[]
+  const { data: teamRows, error: teamsErr } = await supabase
+    .from('teams')
+    .select('id, name, invite_code')
+    .in('id', teamIds)
+
+  if (teamsErr) {
+    return NextResponse.json({ error: teamsErr.message }, { status: 500 })
+  }
+
+  const byId = new Map((teamRows ?? []).map((t) => [t.id, t]))
+  const teams: TeamRow[] = rows
+    .map((m) => {
+      const t = byId.get(m.team_id)
+      if (!t?.id) return null
+      const role = m.role === 'owner' || m.role === 'member' ? m.role : undefined
+      return { ...t, role } as TeamRow
     })
     .filter((t): t is TeamRow => t != null)
 
@@ -42,4 +64,3 @@ export async function GET() {
 
   return NextResponse.json({ teams, activeTeamId })
 }
-
