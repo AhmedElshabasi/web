@@ -333,10 +333,19 @@ export function FileShareDashboard() {
               score_percent: clamped,
               model: modelName,
             })
-            if (persistErr) {
-              console.error('[ai_insight_runs]', persistErr)
-              showToast('Insights generated, but could not save to team history.')
+            const { error: linkErr } = await supabaseBrowser.rpc('link_report_upload_to_rubric', {
+              p_report_upload_id: reportRow.uploadId,
+              p_rubric_upload_id: rubricPkg.id,
+            })
+            if (persistErr) console.error('[ai_insight_runs]', persistErr)
+            if (linkErr) console.error('[link_report_upload_to_rubric]', linkErr)
+            if (persistErr || linkErr) {
+              const parts: string[] = []
+              if (persistErr) parts.push('insight history')
+              if (linkErr) parts.push('rubric link on the report')
+              showToast(`Insights ready, but could not save ${parts.join(' or ')}.`)
             }
+            router.refresh()
           }
         }
 
@@ -358,6 +367,7 @@ export function FileShareDashboard() {
   }, [
     activeTeamId,
     reportOptions,
+    router,
     rubricPackages,
     selectedRubricUploadId,
     selectedReportValue,

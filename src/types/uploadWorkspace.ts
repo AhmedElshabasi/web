@@ -37,6 +37,8 @@ export type UploadPackageRow = {
   is_rubric?: boolean | null
   /** Set for report uploads; null for rubrics. */
   report_status?: UploadReportStatus | null
+  /** Rubric package this report was last evaluated against (set on successful Generate insights). */
+  linked_rubric_upload_id?: string | null
   created_at: string | null
   team_id?: string | null
   upload_files: UploadFileRow[] | null
