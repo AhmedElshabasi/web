@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import { ActivityLogPanel } from '@/components/ActivityLogPanel'
+import { NoRedundancyLogoMark } from '@/components/NoRedundancyLogoMark'
 import { RecentTransfersPanel } from '@/components/RecentTransfersPanel'
 import { TeamSwitcher } from '@/components/TeamSwitcher'
 
@@ -137,13 +138,7 @@ export function MainPageShell({
           aria-hidden={isMobileLayout && !sidebarOpen ? true : undefined}
         >
           <div className="sidebar-logo">
-            <div className="sidebar-logo-mark">
-              <div className="icon">📁</div>
-              <div>
-                <div className="sidebar-wordmark">NoRedundancy</div>
-                <div className="sidebar-sub">AI-powered <br />Report Insights</div>
-              </div>
-            </div>
+            <NoRedundancyLogoMark />
           </div>
 
           <div className="sidebar-section">

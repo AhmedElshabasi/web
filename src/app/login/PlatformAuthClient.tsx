@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import { missingSupabaseEnvMessage } from '@/lib/supabaseEnv'
 import { isUcalgaryEmail, resolveUcalgaryEmail } from '@/lib/ucalgaryEmail'
+import { NoRedundancyLogoMark } from '@/components/NoRedundancyLogoMark'
 
 type Screen = 'login' | 'confirm'
 
@@ -148,20 +149,7 @@ export function PlatformAuthClient({ supabaseConfigured }: { supabaseConfigured:
 
         <div className="login-card">
           <div className="login-logo">
-            <div
-              className="login-logo-icon"
-              style={{ background: 'none', padding: 0, overflow: 'hidden', borderRadius: 8 }}
-            >
-              <img
-                src="/sign-in-ref/logo-icon.png"
-                alt=""
-                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }}
-              />
-            </div>
-            <div className="login-logo-text">
-              NoRedundancy
-              <em>AI</em>
-            </div>
+            <NoRedundancyLogoMark />
           </div>
 
           {missingEnv || !supabaseConfigured ? (

@@ -1,0 +1,52 @@
+/* Shared NoRedundancy mark: PNG icon + wordmark + tagline (login + main sidebar). */
+#sign-in-reference-root .nr-brand,
+#main-page-root .nr-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#sign-in-reference-root .nr-brand-icon,
+#main-page-root .nr-brand-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+#sign-in-reference-root .nr-brand-icon img,
+#main-page-root .nr-brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+#sign-in-reference-root .nr-brand-text,
+#main-page-root .nr-brand-text {
+  min-width: 0;
+}
+
+#sign-in-reference-root .nr-brand-wordmark,
+#main-page-root .nr-brand-wordmark {
+  font-family: var(--serif);
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: -0.3px;
+  line-height: 1.1;
+}
+
+#sign-in-reference-root .nr-brand-sub,
+#main-page-root .nr-brand-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 4px;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+}
