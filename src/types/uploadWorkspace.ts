@@ -19,6 +19,8 @@ export type UploadPackageRow = {
   uploader_email: string | null
   /** Set when creating the upload in File Share. */
   note: string | null
+  /** True when the uploader marked the batch as a rubric. */
+  is_rubric?: boolean | null
   created_at: string | null
   team_id?: string | null
   upload_files: UploadFileRow[] | null

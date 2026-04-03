@@ -6,6 +6,13 @@ import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import type { UploadNoteRow, UploadPackageRow } from '@/types/uploadWorkspace'
 
+type DeleteConfirmTarget = {
+  uploadId: string
+  fileId: string
+  storagePath: string
+  originalName: string
+}
+
 function ext(name: string) {
   const parts = name.split('.')
   return parts.length > 1 ? parts.pop()!.slice(0, 4).toUpperCase() : 'FILE'
@@ -75,13 +82,76 @@ function sortNotesDesc(notes: UploadNoteRow[] | null | undefined): UploadNoteRow
   return list
 }
 
+function packageTotalBytes(u: UploadPackageRow): number {
+  return (u.upload_files || []).reduce((s, f) => s + (typeof f.size === 'number' ? f.size : 0), 0)
+}
+
+function packageNoteCount(u: UploadPackageRow): number {
+  return u.upload_notes?.length ?? 0
+}
+
+function createdAtMs(iso: string | null | undefined): number {
+  if (!iso) return 0
+  const t = new Date(iso).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
+function matchesPackageSearch(u: UploadPackageRow, q: string): boolean {
+  const s = q.trim().toLowerCase()
+  if (!s) return true
+  for (const f of u.upload_files || []) {
+    if (f.original_name.toLowerCase().includes(s)) return true
+  }
+  const email = (u.uploader_email ?? '').toLowerCase()
+  if (email.includes(s)) return true
+  if (displayNameFromEmail(u.uploader_email).toLowerCase().includes(s)) return true
+  if ((u.note ?? '').toLowerCase().includes(s)) return true
+  for (const n of u.upload_notes || []) {
+    if ((n.body ?? '').toLowerCase().includes(s)) return true
+    if ((n.author_email ?? '').toLowerCase().includes(s)) return true
+  }
+  return false
+}
+
+type TransferSortKey = 'newest' | 'oldest' | 'largest' | 'most-notes'
+
+function sortPackages(list: UploadPackageRow[], sortKey: TransferSortKey): UploadPackageRow[] {
+  const next = [...list]
+  switch (sortKey) {
+    case 'newest':
+      next.sort((a, b) => createdAtMs(b.created_at) - createdAtMs(a.created_at))
+      break
+    case 'oldest':
+      next.sort((a, b) => createdAtMs(a.created_at) - createdAtMs(b.created_at))
+      break
+    case 'largest':
+      next.sort((a, b) => packageTotalBytes(b) - packageTotalBytes(a))
+      break
+    case 'most-notes':
+      next.sort((a, b) => {
+        const d = packageNoteCount(b) - packageNoteCount(a)
+        if (d !== 0) return d
+        return createdAtMs(b.created_at) - createdAtMs(a.created_at)
+      })
+      break
+    default:
+      break
+  }
+  return next
+}
+
 export function RecentTransfersPanel() {
   const router = useRouter()
   const { initialUploads, loadError } = useUploadsWorkspace()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<TransferSortKey>('newest')
   const [addNoteFor, setAddNoteFor] = useState<UploadPackageRow | null>(null)
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [noteError, setNoteError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmTarget | null>(null)
 
   useEffect(() => {
     if (!addNoteFor) {
@@ -90,13 +160,90 @@ export function RecentTransfersPanel() {
     }
   }, [addNoteFor])
 
-  const copyFirstLink = useCallback(async (u: UploadPackageRow) => {
-    const path = u.upload_files?.[0]?.storage_path
-    if (!path || !supabaseBrowser) return
-    const { data, error } = await supabaseBrowser.storage.from('uploads').createSignedUrl(path, 3600)
-    if (error || !data?.signedUrl || !navigator.clipboard) return
-    void navigator.clipboard.writeText(data.signedUrl)
+  const showToast = useCallback((message: string) => {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2200)
   }, [])
+
+  const downloadFile = useCallback(
+    async (storagePath: string, filename: string) => {
+      if (!supabaseBrowser) {
+        showToast('Supabase is not configured.')
+        return
+      }
+      const { data, error } = await supabaseBrowser.storage.from('uploads').createSignedUrl(storagePath, 3600)
+      if (error || !data?.signedUrl) {
+        showToast('Could not download file.')
+        return
+      }
+      const a = document.createElement('a')
+      a.href = data.signedUrl
+      a.download = filename
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    },
+    [showToast],
+  )
+
+  const runDeleteSharedFile = useCallback(
+    async (target: DeleteConfirmTarget) => {
+      if (!supabaseBrowser) {
+        showToast('Supabase is not configured.')
+        return
+      }
+      setDeletingId(target.fileId)
+      try {
+        const { error: storageErr } = await supabaseBrowser.storage.from('uploads').remove([target.storagePath])
+        if (storageErr) {
+          console.warn('[uploads] storage remove:', storageErr.message)
+        }
+
+        const { data: deletedRows, error: fileErr } = await supabaseBrowser
+          .from('upload_files')
+          .delete()
+          .eq('id', target.fileId)
+          .select('id')
+
+        if (fileErr) throw fileErr
+        if (!deletedRows?.length) {
+          throw new Error(
+            'Delete did not remove any file. You are not the owner of this file.',
+          )
+        }
+
+        const { data: remaining } = await supabaseBrowser
+          .from('upload_files')
+          .select('id')
+          .eq('upload_id', target.uploadId)
+          .limit(1)
+        if (!remaining?.length) {
+          const { error: uploadErr } = await supabaseBrowser.from('uploads').delete().eq('id', target.uploadId)
+          if (uploadErr) console.warn('[uploads] delete package:', uploadErr.message)
+        }
+
+        setDeleteConfirm(null)
+        showToast('File deleted.')
+        router.refresh()
+      } catch (e: unknown) {
+        showToast(e instanceof Error ? e.message : 'Delete failed.')
+      } finally {
+        setDeletingId(null)
+      }
+    },
+    [router, showToast],
+  )
+
+  useEffect(() => {
+    if (!deleteConfirm) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !deletingId) setDeleteConfirm(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [deleteConfirm, deletingId])
 
   const submitNewNote = useCallback(async () => {
     if (!addNoteFor || !supabaseBrowser) return
@@ -127,8 +274,52 @@ export function RecentTransfersPanel() {
     [addNoteFor],
   )
 
+  const visibleUploads = useMemo(() => {
+    const filtered = initialUploads.filter((u) => matchesPackageSearch(u, searchQuery))
+    return sortPackages(filtered, sortKey)
+  }, [initialUploads, searchQuery, sortKey])
+
   return (
     <div className="recent-transfers-page">
+      {deleteConfirm ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onClick={() => {
+            if (!deletingId) setDeleteConfirm(null)
+          }}
+        >
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rt-delete-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="rt-delete-dialog-title" className="confirm-dialog-title">
+              Delete this file?
+            </h2>
+            <p className="confirm-dialog-body">
+              <strong>{deleteConfirm.originalName}</strong> will be removed from storage and the database. This cannot be
+              undone.
+            </p>
+            <div className="confirm-dialog-actions">
+              <button type="button" className="secondary-btn" onClick={() => setDeleteConfirm(null)} disabled={!!deletingId}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm-dialog-delete"
+                disabled={deletingId === deleteConfirm.fileId}
+                onClick={() => void runDeleteSharedFile(deleteConfirm)}
+              >
+                {deletingId === deleteConfirm.fileId ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {addNoteFor ? (
         <div
           className="confirm-overlay"
@@ -213,11 +404,10 @@ export function RecentTransfersPanel() {
       <section className="rt-hero">
         <div className="rt-hero-inner">
           <div>
-            <div className="rt-kicker">Transfer intelligence</div>
-            <h1>Recent transfers</h1>
+            
+            <h1>Uploads</h1>
             <p>
-              Track every file handoff, see what got opened, and catch links that are about to die before someone pings
-              you saying the download is broken.
+              Track every file handoff, see what got uploaded, and manage your files all in one place.
             </p>
           </div>
           <div className="rt-live-chip">
@@ -234,15 +424,23 @@ export function RecentTransfersPanel() {
             <div className="rt-toolbar">
               <input
                 className="rt-search"
-                type="text"
+                type="search"
                 placeholder="Search file, uploader, or note"
-                readOnly
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search transfers by file name, uploader, or note"
+                autoComplete="off"
               />
-              <select className="rt-sort" defaultValue="newest">
+              <select
+                className="rt-sort"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as TransferSortKey)}
+                aria-label="Sort transfers"
+              >
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
                 <option value="largest">Largest first</option>
-                <option value="most-opened">Most opened</option>
+                <option value="most-notes">Most notes</option>
               </select>
             </div>
           </div>
@@ -273,11 +471,20 @@ export function RecentTransfersPanel() {
                       </td>
                     </tr>
                   ) : null}
-                  {initialUploads.map((u) => {
+                  {initialUploads.length > 0 && visibleUploads.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>
+                        <div className="empty-state" style={{ margin: 16, border: 'none' }}>
+                          No transfers match your search.
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                  {visibleUploads.map((u) => {
                     const { primary, meta, badge } = packageSummary(u)
                     const email = u.uploader_email
                     const name = displayNameFromEmail(email)
-                    const firstPath = u.upload_files?.[0]?.storage_path ?? null
+                    const files = u.upload_files || []
                     const uploadNote = u.note?.trim()
 
                     return (
@@ -287,7 +494,14 @@ export function RecentTransfersPanel() {
                             <div className="rt-file-badge">{badge}</div>
                             <div>
                               <div className="rt-file-name">{primary}</div>
-                              <div className="rt-file-meta">{meta}</div>
+                              <div className="rt-file-meta">
+                                {meta}
+                                {u.is_rubric ? (
+                                  <span className="rt-rubric-tag" title="Rubric">
+                                    Rubric
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -309,15 +523,43 @@ export function RecentTransfersPanel() {
                           <div className="rt-date-meta">{formatWhen(u.created_at)}</div>
                         </td>
                         <td>
-                          <div className="rt-actions">
+                          <div className="rt-actions rt-actions--stack">
                             <button type="button" className="rt-btn" onClick={() => setAddNoteFor(u)}>
                               Add note
                             </button>
-                            {firstPath ? (
-                              <button type="button" className="rt-btn" onClick={() => void copyFirstLink(u)}>
-                                Copy link
-                              </button>
-                            ) : null}
+                            {files.map((f) => (
+                              <div key={f.id} className="rt-file-action-line">
+                                {supabaseBrowser ? (
+                                  <button
+                                    type="button"
+                                    className="mini-btn download-link"
+                                    onClick={() => void downloadFile(f.storage_path, f.original_name)}
+                                  >
+                                    Download
+                                  </button>
+                                ) : (
+                                  <span className="rt-user-meta" style={{ fontSize: 11 }}>
+                                    Unavailable
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="file-remove share-file-delete"
+                                  disabled={deletingId === f.id}
+                                  aria-label={`Delete ${f.original_name}`}
+                                  onClick={() =>
+                                    setDeleteConfirm({
+                                      uploadId: u.id,
+                                      fileId: f.id,
+                                      storagePath: f.storage_path,
+                                      originalName: f.original_name,
+                                    })
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         </td>
                       </tr>
@@ -328,6 +570,10 @@ export function RecentTransfersPanel() {
             </div>
           </div>
         </section>
+      </div>
+
+      <div className={`toast${toast ? ' show' : ''}`} id="rt-transfer-toast" role="status">
+        {toast ?? ''}
       </div>
     </div>
   )

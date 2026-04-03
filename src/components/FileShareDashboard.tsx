@@ -15,6 +15,11 @@ type DeleteConfirmTarget = {
   originalName: string
 }
 
+type TeamDeleteConfirmTarget = {
+  id: string
+  name: string
+}
+
 function ext(name: string) {
   const parts = name.split('.')
   return parts.length > 1 ? parts.pop()!.slice(0, 4).toUpperCase() : 'FILE'
@@ -59,13 +64,21 @@ function isAllowedFile(file: File) {
 }
 
 export function FileShareDashboard() {
-  const { initialUploads, serverUploadCount, serverTotalBytes, loadError, teams, activeTeamId } =
-    useUploadsWorkspace()
+  const {
+    initialUploads,
+    serverUploadCount,
+    serverTotalBytes,
+    loadError,
+    teams,
+    activeTeamId,
+    refreshTeams,
+  } = useUploadsWorkspace()
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const [queue, setQueue] = useState<File[]>([])
   const [note, setNote] = useState('')
+  const [isRubric, setIsRubric] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +87,8 @@ export function FileShareDashboard() {
   const [toast, setToast] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmTarget | null>(null)
+  const [teamDeleteConfirm, setTeamDeleteConfirm] = useState<TeamDeleteConfirmTarget | null>(null)
+  const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null)
 
   const queueBytes = useMemo(() => queue.reduce((a, f) => a + f.size, 0), [queue])
 
@@ -139,13 +154,16 @@ export function FileShareDashboard() {
   )
 
   useEffect(() => {
-    if (!deleteConfirm) return
+    if (!deleteConfirm && !teamDeleteConfirm) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !deletingId) setDeleteConfirm(null)
+      if (e.key !== 'Escape') return
+      if (deletingId || deletingTeamId) return
+      setDeleteConfirm(null)
+      setTeamDeleteConfirm(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [deleteConfirm, deletingId])
+  }, [deleteConfirm, teamDeleteConfirm, deletingId, deletingTeamId])
 
   useEffect(() => {
     const supabase = supabaseBrowser
@@ -263,6 +281,7 @@ export function FileShareDashboard() {
           team_id: activeTeamId,
           uploader_email: user.email ?? null,
           note: note.trim() || null,
+          is_rubric: isRubric,
         })
         .select('id')
         .single()
@@ -295,10 +314,13 @@ export function FileShareDashboard() {
       }
 
       const n = queue.length
-      const meta = `${n} file${n === 1 ? '' : 's'} • ${fmtSize(queueBytes)}${note.trim() ? ' • note added' : ''}`
+      const meta = `${n} file${n === 1 ? '' : 's'} • ${fmtSize(queueBytes)}${note.trim() ? ' • note added' : ''}${
+        isRubric ? ' • Rubric' : ''
+      }`
       setLastBatchMeta(meta)
       setQueue([])
       setNote('')
+      setIsRubric(false)
       setShowResult(true)
       showToast('Upload complete.')
       router.refresh()
@@ -333,7 +355,7 @@ export function FileShareDashboard() {
       if (fileErr) throw fileErr
       if (!deletedRows?.length) {
         throw new Error(
-          'Delete did not remove any row. If you own this file, re-run supabase/migrations/003_uploads_delete_policies.sql in the SQL editor.',
+          'Delete did not remove any file. You are not the owner of this file.',
         )
       }
 
@@ -357,6 +379,26 @@ export function FileShareDashboard() {
     }
   }
 
+  const runDeleteTeam = async (target: TeamDeleteConfirmTarget) => {
+    if (!supabaseBrowser) {
+      showToast('Supabase is not configured.')
+      return
+    }
+    setDeletingTeamId(target.id)
+    try {
+      const { error: rpcErr } = await supabaseBrowser.rpc('delete_team', { p_team_id: target.id })
+      if (rpcErr) throw rpcErr
+      setTeamDeleteConfirm(null)
+      showToast('Team deleted.')
+      await refreshTeams()
+      router.refresh()
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Could not delete team.')
+    } finally {
+      setDeletingTeamId(null)
+    }
+  }
+
   const shareListBody =
     initialUploads.length === 0 ? (
       <div className="empty-state">No files yet. Upload a PDF or DOCX and it will show up here.</div>
@@ -371,6 +413,11 @@ export function FileShareDashboard() {
               <div>
                 <div className="share-title">
                   {files.length} file{files.length === 1 ? '' : 's'} • {fmtSize(total)}
+                  {u.is_rubric ? (
+                    <span className="share-rubric-badge" title="Marked as rubric">
+                      Rubric
+                    </span>
+                  ) : null}
                 </div>
                 <div className="share-sub">
                   {u.uploader_email ?? 'Unknown'} • {formatShortDate(u.created_at)}
@@ -469,13 +516,57 @@ export function FileShareDashboard() {
         </div>
       ) : null}
 
+      {teamDeleteConfirm ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onClick={() => {
+            if (!deletingTeamId) setTeamDeleteConfirm(null)
+          }}
+        >
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-team-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-team-dialog-title" className="confirm-dialog-title">
+              Delete this team?
+            </h2>
+            <p className="confirm-dialog-body">
+              <strong>{teamDeleteConfirm.name}</strong> and all of its shared uploads will be removed for every
+              member. This cannot be undone.
+            </p>
+            <div className="confirm-dialog-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                disabled={deletingTeamId !== null}
+                onClick={() => setTeamDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm-dialog-delete"
+                disabled={deletingTeamId === teamDeleteConfirm.id}
+                onClick={() => void runDeleteTeam(teamDeleteConfirm)}
+              >
+                {deletingTeamId === teamDeleteConfirm.id ? 'Deleting…' : 'Delete team'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="hero">
         <div className="hero-inner">
           <div>
             <h1>
-              Share files
+              Upload files and
               <br />
-              without the clutter.
+               get AI-powered insights.
             </h1>
             <p>
               Upload PDF and DOCX files only. Files are visible only to members of the team you select in the sidebar.
@@ -484,88 +575,6 @@ export function FileShareDashboard() {
           <div className="hero-meta">Secure file sharing workspace</div>
         </div>
       </section>
-
-      <section className="card fs-team-insights" aria-labelledby="fs-team-insights-title">
-        <div className="card-header">
-          <div className="card-title" id="fs-team-insights-title">
-            Your teams &amp; invite codes
-          </div>
-        </div>
-        <div className="card-body">
-          {teams.length === 0 ? (
-            <p className="fs-team-insights-lead">
-              You are not in any team yet. Use the sidebar to create one (you will get an invite code) or join with
-              someone else&apos;s code. Then pick the active team there — uploads on this page go to that group only.
-            </p>
-          ) : (
-            <>
-              <p className="fs-team-insights-lead">
-                You are in <strong>{teams.length}</strong> team{teams.length === 1 ? '' : 's'} (
-                {teamInsightCounts.owned} you created, {teamInsightCounts.joined} you joined). New uploads use the team
-                selected in the sidebar (<strong>Active</strong> below). Share the invite
-                code so people can join the same group and see those files.
-              </p>
-              <ul className="fs-team-insights-list">
-                {teamsSorted.map((t) => {
-                  const isActive = t.id === activeTeamId
-                  const roleLabel =
-                    t.role === 'owner' ? 'Owner' : t.role === 'member' ? 'Member' : null
-                  return (
-                    <li key={t.id} className="fs-team-insights-row">
-                      <div className="fs-team-insights-top">
-                        <span className="fs-team-insights-name">{t.name}</span>
-                        <span className="fs-team-insights-badges">
-                          {isActive ? (
-                            <span className="fs-team-insights-badge fs-team-insights-badge--active">Active</span>
-                          ) : null}
-                          {roleLabel ? (
-                            <span
-                              className={`fs-team-insights-badge fs-team-insights-badge--${t.role ?? 'member'}`}
-                            >
-                              {roleLabel}
-                            </span>
-                          ) : null}
-                        </span>
-                      </div>
-                      <div className="fs-team-insights-code-block">
-                        <div className="fs-team-insights-code-label">Invite code</div>
-                        <div className="fs-team-insights-code-row">
-                          <code className="fs-team-insights-code">{t.invite_code}</code>
-                          <button
-                            type="button"
-                            className="secondary-btn fs-team-insights-copy"
-                            onClick={() => copyInviteCode(t.invite_code)}
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
-          )}
-        </div>
-      </section>
-
-      <div className="dashboard-grid">
-        <div className="stat-card red">
-          <div className="stat-label">Files queued</div>
-          <div className="stat-value">{queue.length}</div>
-          <div className="stat-sub">Ready to send</div>
-        </div>
-        <div className="stat-card gold">
-          <div className="stat-label">Transfers created</div>
-          <div className="stat-value">{serverUploadCount}</div>
-          <div className="stat-sub">Upload batches</div>
-        </div>
-        <div className="stat-card blue">
-          <div className="stat-label">Total size moved</div>
-          <div className="stat-value">{fmtSize(serverTotalBytes + queueBytes)}</div>
-          <div className="stat-sub">Across all shares</div>
-        </div>
-      </div>
 
       {loadError ? (
         <div className="empty-state" style={{ marginBottom: 16, borderColor: 'var(--red)', color: 'var(--ink)' }}>
@@ -584,9 +593,9 @@ export function FileShareDashboard() {
       ) : null}
 
       <div className="layout">
-        <section className="card">
+        <section className="card card--accent-red">
           <div className="card-header">
-            <div className="card-title">📤 Create share</div>
+            <div className="card-title">📤 Upload</div>
           </div>
           <div className="card-body">
             <div
@@ -664,6 +673,17 @@ export function FileShareDashboard() {
 
             <div className="form-grid" id="share-settings" style={{ display: hasFiles ? undefined : 'none' }}>
               <div className="form-field full">
+                <label className="upload-rubric-check" htmlFor="upload-is-rubric">
+                  <input
+                    id="upload-is-rubric"
+                    type="checkbox"
+                    checked={isRubric}
+                    onChange={(e) => setIsRubric(e.target.checked)}
+                  />
+                  <span>Rubric</span>
+                </label>
+              </div>
+              <div className="form-field full">
                 <label htmlFor="note">Share note</label>
                 <textarea
                   id="note"
@@ -694,9 +714,9 @@ export function FileShareDashboard() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card card--accent-gold">
           <div className="card-header">
-            <div className="card-title">📥 Shared files</div>
+            <div className="card-title">📥 Insights </div>
           </div>
           <div className="card-body">
             <div className="share-list" id="share-list">
@@ -705,6 +725,100 @@ export function FileShareDashboard() {
           </div>
         </section>
       </div>
+
+      <div className="dashboard-grid">
+        <div className="stat-card red">
+          <div className="stat-label">Files queued</div>
+          <div className="stat-value">{queue.length}</div>
+          <div className="stat-sub">Ready to send</div>
+        </div>
+        <div className="stat-card gold">
+          <div className="stat-label">Transfers created</div>
+          <div className="stat-value">{serverUploadCount}</div>
+          <div className="stat-sub">Upload batches</div>
+        </div>
+        <div className="stat-card blue">
+          <div className="stat-label">Total size moved</div>
+          <div className="stat-value">{fmtSize(serverTotalBytes + queueBytes)}</div>
+          <div className="stat-sub">Across all shares</div>
+        </div>
+      </div>
+
+      <section className="card fs-team-insights" aria-labelledby="fs-team-insights-title">
+        <div className="card-header">
+          <div className="card-title" id="fs-team-insights-title">
+            Your teams &amp; invite codes
+          </div>
+        </div>
+        <div className="card-body">
+          {teams.length === 0 ? (
+            <p className="fs-team-insights-lead">
+              You are not in any team yet. Use the sidebar to create one (you will get an invite code) or join with
+              someone else&apos;s code. Then pick the active team there — uploads on this page go to that group only.
+            </p>
+          ) : (
+            <>
+              <p className="fs-team-insights-lead">
+                You are in <strong>{teams.length}</strong> team{teams.length === 1 ? '' : 's'} (
+                {teamInsightCounts.owned} you created, {teamInsightCounts.joined} you joined). New uploads use the team
+                selected in the sidebar (<strong>Active</strong> in this list). Share the invite code so people can join
+                the same group and see those files.
+              </p>
+              <ul className="fs-team-insights-list">
+                {teamsSorted.map((t) => {
+                  const isActive = t.id === activeTeamId
+                  const roleLabel =
+                    t.role === 'owner' ? 'Owner' : t.role === 'member' ? 'Member' : null
+                  return (
+                    <li key={t.id} className="fs-team-insights-row">
+                      <div className="fs-team-insights-top">
+                        <span className="fs-team-insights-name">{t.name}</span>
+                        <span className="fs-team-insights-badges">
+                          {isActive ? (
+                            <span className="fs-team-insights-badge fs-team-insights-badge--active">Active</span>
+                          ) : null}
+                          {roleLabel ? (
+                            <span
+                              className={`fs-team-insights-badge fs-team-insights-badge--${t.role ?? 'member'}`}
+                            >
+                              {roleLabel}
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                      <div className="fs-team-insights-code-block">
+                        <div className="fs-team-insights-code-label">Invite code</div>
+                        <div className="fs-team-insights-code-row">
+                          <code className="fs-team-insights-code">{t.invite_code}</code>
+                          <div className="fs-team-insights-code-actions">
+                            <button
+                              type="button"
+                              className="secondary-btn fs-team-insights-copy"
+                              onClick={() => copyInviteCode(t.invite_code)}
+                            >
+                              Copy
+                            </button>
+                            {t.role === 'owner' ? (
+                              <button
+                                type="button"
+                                className="fs-team-insights-delete"
+                                disabled={deletingTeamId === t.id}
+                                onClick={() => setTeamDeleteConfirm({ id: t.id, name: t.name })}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+        </div>
+      </section>
 
       <div className={`toast${toast ? ' show' : ''}`} id="toast" role="status">
         {toast ?? ''}

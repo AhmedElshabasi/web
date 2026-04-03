@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import { ActivityLogPanel } from '@/components/ActivityLogPanel'
 import { RecentTransfersPanel } from '@/components/RecentTransfersPanel'
@@ -29,7 +29,7 @@ type WorkspacePage = 'file-share' | 'recent-transfers' | 'activity-log'
 
 const TOPBAR_TITLES: Record<WorkspacePage, string> = {
   'file-share': 'File Share',
-  'recent-transfers': 'Recent Transfers',
+  'recent-transfers': 'Uploads',
   'activity-log': 'Activity Log',
 }
 
@@ -43,6 +43,8 @@ export function MainPageShell({
   const [dark, setDark] = useState(true)
   const [signOutBusy, setSignOutBusy] = useState(false)
   const [activePage, setActivePage] = useState<WorkspacePage>('file-share')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobileLayout, setIsMobileLayout] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -74,6 +76,37 @@ export function MainPageShell({
     else el.classList.remove('dark-mode')
   }, [dark])
 
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 980px)')
+    const sync = () => {
+      setIsMobileLayout(mq.matches)
+      if (!mq.matches) setSidebarOpen(false)
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [sidebarOpen])
+
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sidebarOpen])
+
   const signOut = async () => {
     try {
       setSignOutBusy(true)
@@ -90,14 +123,25 @@ export function MainPageShell({
 
   return (
     <div id="main-page-root">
-      <div className="shell">
-        <aside className="sidebar">
+      <div className={`shell${sidebarOpen ? ' shell--nav-open' : ''}`}>
+        {sidebarOpen ? (
+          <button
+            type="button"
+            className="sidebar-backdrop"
+            aria-label="Close menu"
+            onClick={closeSidebar}
+          />
+        ) : null}
+        <aside
+          className="sidebar"
+          aria-hidden={isMobileLayout && !sidebarOpen ? true : undefined}
+        >
           <div className="sidebar-logo">
             <div className="sidebar-logo-mark">
               <div className="icon">📁</div>
               <div>
                 <div className="sidebar-wordmark">NoRedundancy</div>
-                <div className="sidebar-sub">Secure file sharing</div>
+                <div className="sidebar-sub">AI-powered <br />Report Insights</div>
               </div>
             </div>
           </div>
@@ -112,21 +156,30 @@ export function MainPageShell({
             <button
               type="button"
               className={`nav-item${activePage === 'file-share' ? ' active' : ''}`}
-              onClick={() => setActivePage('file-share')}
+              onClick={() => {
+                setActivePage('file-share')
+                closeSidebar()
+              }}
             >
              <span>↗</span> File Share
             </button>
             <button
               type="button"
               className={`nav-item${activePage === 'recent-transfers' ? ' active' : ''}`}
-              onClick={() => setActivePage('recent-transfers')}
+              onClick={() => {
+                setActivePage('recent-transfers')
+                closeSidebar()
+              }}
             >
-              <span>◌</span> Recent Transfers
+              <span>◌</span> Uploads
             </button>
             <button
               type="button"
               className={`nav-item${activePage === 'activity-log' ? ' active' : ''}`}
-              onClick={() => setActivePage('activity-log')}
+              onClick={() => {
+                setActivePage('activity-log')
+                closeSidebar()
+              }}
             >
               <span>◌</span> Activity Log
             </button>
@@ -145,7 +198,22 @@ export function MainPageShell({
 
         <main className="main-content">
           <div className="topbar">
-            <div className="topbar-title">{TOPBAR_TITLES[activePage]}</div>
+            <div className="topbar-start">
+              <button
+                type="button"
+                className="sidebar-menu-btn"
+                aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={sidebarOpen}
+                onClick={() => setSidebarOpen((o) => !o)}
+              >
+                <span className="sidebar-menu-icon" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              </button>
+              <div className="topbar-title">{TOPBAR_TITLES[activePage]}</div>
+            </div>
             <div className="topbar-actions">
               <button
                 type="button"

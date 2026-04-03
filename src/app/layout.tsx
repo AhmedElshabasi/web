@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'NoRedundancy — File Share',
-  description: 'Secure file sharing',
+  description: 'AI-powered Report Insights',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

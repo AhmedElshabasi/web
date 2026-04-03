@@ -12,6 +12,7 @@ export function TeamSwitcher() {
   const [error, setError] = useState<string | null>(null)
   const [createName, setCreateName] = useState('')
   const [joinCode, setJoinCode] = useState('')
+  const [inviteCopied, setInviteCopied] = useState(false)
 
   useEffect(() => {
     // If the initial server render returned no teams, re-check membership once.
@@ -22,6 +23,21 @@ export function TeamSwitcher() {
     () => teams.find((t) => t.id === activeTeamId) ?? null,
     [teams, activeTeamId],
   )
+
+  useEffect(() => {
+    setInviteCopied(false)
+  }, [activeTeamId])
+
+  const copyInviteCode = useCallback((code: string) => {
+    if (!navigator.clipboard) {
+      setError('Clipboard not available.')
+      return
+    }
+    setError(null)
+    void navigator.clipboard.writeText(code)
+    setInviteCopied(true)
+    window.setTimeout(() => setInviteCopied(false), 2000)
+  }, [])
 
   const setActiveTeam = useCallback(
     async (teamId: string) => {
@@ -127,7 +143,16 @@ export function TeamSwitcher() {
           {activeTeam ? (
             <div className="team-invite-block">
               <div className="team-invite-label">Invite code</div>
-              <code className="team-invite-code">{activeTeam.invite_code}</code>
+              <div className="team-invite-code-row">
+                <code className="team-invite-code">{activeTeam.invite_code}</code>
+                <button
+                  type="button"
+                  className="team-invite-copy"
+                  onClick={() => copyInviteCode(activeTeam.invite_code)}
+                >
+                  {inviteCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
               <p className="team-invite-hint">Share this code so others can join this team.</p>
             </div>
           ) : null}
