@@ -5,6 +5,7 @@ import type { TeamRow } from '@/types/team'
 import type { UploadPackageRow } from '@/types/uploadWorkspace'
 import { UploadsWorkspaceProvider } from '@/contexts/UploadsWorkspaceContext'
 import { MainPageShell } from '@/components/MainPageShell'
+import '@/styles/nr-brand-logo.css'
 import './main-page-reference.css'
 
 export const dynamic = 'force-dynamic'
