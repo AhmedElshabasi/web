@@ -136,10 +136,23 @@
   padding: 8px 10px;
   border-radius: 7px;
   border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.9);
+  /* Solid dark surface so the closed control and OS dropdown pick up correct contrast. */
+  background: #1a1d21;
+  color: rgba(255,255,255,.92);
   font-size: 13px;
   font-family: var(--sans);
+  /* Native popup (esp. Windows/Chrome) follows scheme — avoids white list + white text. */
+  color-scheme: dark;
+}
+
+#main-page-root .team-select:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 1px;
+}
+
+#main-page-root .team-select option {
+  background-color: #1e2228;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 #main-page-root .team-invite-block {
