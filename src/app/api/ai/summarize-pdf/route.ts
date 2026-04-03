@@ -1,10 +1,16 @@
+/** Must run before `pdf-parse` (Vercel / pdfjs worker). */
+import 'pdf-parse/worker'
+import { CanvasFactory } from 'pdf-parse/worker'
+import { PDFParse } from 'pdf-parse'
+
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { PDFParse } from 'pdf-parse'
 import { z } from 'zod'
 import { supabaseServerClientOrNull } from '@/lib/supabaseServer'
 
 export const runtime = 'nodejs'
+/** Vercel: allow time for download + PDF parse + OpenAI */
+export const maxDuration = 60
 
 const bodySchema = z.object({
   fileId: z.string().uuid(),
@@ -23,7 +29,7 @@ Requirements:
 - Do not invent facts that are not supported by the text.`
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) })
+  const parser = new PDFParse({ data: new Uint8Array(buffer), CanvasFactory })
   try {
     const result = await parser.getText()
     return (result.text || '').trim()
@@ -38,7 +44,7 @@ function isPdfMime(mime: string | null, filename: string): boolean {
   return filename.toLowerCase().endsWith('.pdf')
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request): Promise<NextResponse> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     return NextResponse.json(
@@ -149,5 +155,15 @@ export async function POST(request: Request) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'OpenAI request failed'
     return NextResponse.json({ error: msg }, { status: 502 })
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    return await handlePost(request)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Internal server error'
+    console.error('[summarize-pdf]', e)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

@@ -194,18 +194,33 @@ export function FileShareDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId }),
       })
-      const data = (await res.json()) as {
+      const raw = await res.text()
+      let data: {
         summary?: string
         error?: string
         truncated?: boolean
         model?: string
+      }
+      try {
+        data = JSON.parse(raw) as typeof data
+      } catch {
+        setPdfSummaryModal({
+          status: 'error',
+          fileId,
+          fileName,
+          message:
+            res.status >= 500
+              ? `Server error (${res.status}). If this persists, check Vercel logs and OPENAI_API_KEY.`
+              : 'Invalid response from server (not JSON).',
+        })
+        return
       }
       if (!res.ok) {
         setPdfSummaryModal({
           status: 'error',
           fileId,
           fileName,
-          message: data.error || 'Could not summarize PDF',
+          message: data.error || `Could not summarize PDF (${res.status})`,
         })
         return
       }
