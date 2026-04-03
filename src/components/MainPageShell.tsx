@@ -165,16 +165,6 @@ export function MainPageShell({
             </button>
             <button
               type="button"
-              className={`nav-item${activePage === 'recent-transfers' ? ' active' : ''}`}
-              onClick={() => {
-                setActivePage('recent-transfers')
-                closeSidebar()
-              }}
-            >
-              <span>◌</span> Uploads
-            </button>
-            <button
-              type="button"
               className={`nav-item${activePage === 'activity-log' ? ' active' : ''}`}
               onClick={() => {
                 setActivePage('activity-log')
@@ -182,6 +172,16 @@ export function MainPageShell({
               }}
             >
               <span>◌</span> Activity Log
+            </button>
+            <button
+              type="button"
+              className={`nav-item${activePage === 'recent-transfers' ? ' active' : ''}`}
+              onClick={() => {
+                setActivePage('recent-transfers')
+                closeSidebar()
+              }}
+            >
+              <span>◌</span> Uploads
             </button>
           </div>
 

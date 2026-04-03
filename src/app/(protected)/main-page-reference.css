@@ -1057,6 +1057,236 @@
   cursor: wait;
 }
 
+#main-page-root .insights-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  min-height: 140px;
+}
+
+#main-page-root .insights-placeholder {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink2);
+  margin: 0;
+}
+
+#main-page-root .insights-placeholder--muted {
+  color: var(--muted);
+}
+
+#main-page-root .insights-generate-btn {
+  align-self: flex-start;
+}
+
+#main-page-root .insights-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgba(240, 178, 31, 0.09), var(--surface2));
+}
+
+#main-page-root .insights-result-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 18px;
+}
+
+#main-page-root .insights-score-block {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 8px 14px 10px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+#main-page-root .insights-score-number {
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+#main-page-root .insights-score-percent {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+#main-page-root .insights-result-headlines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#main-page-root .insights-result-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#main-page-root .insights-result-pair-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+#main-page-root .insights-result-pair-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+#main-page-root .insights-result-dismiss {
+  align-self: flex-start;
+  margin-left: auto;
+}
+
+#main-page-root .insights-comment {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink2);
+  white-space: pre-wrap;
+}
+
+#main-page-root .insights-select-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  #main-page-root .insights-select-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+#main-page-root .insights-select-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+#main-page-root .insights-select-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+#main-page-root .insights-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+#main-page-root .insights-select:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+}
+
+#main-page-root .insights-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+#main-page-root .insights-running-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+#main-page-root .insights-running-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+#main-page-root .insights-running-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  min-width: 4.5rem;
+}
+
+#main-page-root .insights-running-value {
+  color: var(--ink);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+#main-page-root .insights-spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 0 8px;
+}
+
+#main-page-root .insights-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--gold);
+  animation: insights-spin 0.75s linear infinite;
+}
+
+@keyframes insights-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#main-page-root .insights-spinner-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+#main-page-root .insights-spinner-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 #main-page-root .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1310,6 +1540,54 @@
 }
 
 #main-page-root .confirm-dialog-delete:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+#main-page-root .confirm-dialog.pdf-summary-dialog {
+  max-width: min(720px, 94vw);
+  max-height: min(88vh, 920px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#main-page-root .pdf-summary-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#main-page-root .pdf-summary-status {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+#main-page-root .pdf-summary-error {
+  font-size: 14px;
+  color: var(--red);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+#main-page-root .pdf-summary-model-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  font-family: var(--mono);
+}
+
+#main-page-root .pdf-summary-btn:disabled {
   opacity: 0.65;
   cursor: wait;
 }
@@ -2190,14 +2468,18 @@
     display: inline-flex;
   }
 
+  /* Topbar stays above the drawer; drawer + backdrop sit below it (top: 60px matches .topbar height). */
   #main-page-root .topbar {
     z-index: 250;
   }
 
   #main-page-root .sidebar-backdrop {
     position: fixed;
-    inset: 0;
-    z-index: 199;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 235;
     margin: 0;
     padding: 0;
     border: none;
@@ -2219,11 +2501,11 @@
   #main-page-root .sidebar {
     position: fixed;
     left: 0;
-    top: 0;
+    top: 60px;
     width: min(280px, 88vw);
-    height: 100vh;
-    height: 100dvh;
-    z-index: 200;
+    height: calc(100vh - 60px);
+    height: calc(100dvh - 60px);
+    z-index: 240;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: none;

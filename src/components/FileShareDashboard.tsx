@@ -4,16 +4,9 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
-import type { UploadFileRow, UploadNoteRow, UploadPackageRow } from '@/types/uploadWorkspace'
+import type { UploadPackageRow } from '@/types/uploadWorkspace'
 
 export type { UploadFileRow, UploadNoteRow, UploadPackageRow } from '@/types/uploadWorkspace'
-
-type DeleteConfirmTarget = {
-  uploadId: string
-  fileId: string
-  storagePath: string
-  originalName: string
-}
 
 type TeamDeleteConfirmTarget = {
   id: string
@@ -63,6 +56,35 @@ function isAllowedFile(file: File) {
   return false
 }
 
+function sortPackagesByCreatedDesc(a: UploadPackageRow, b: UploadPackageRow) {
+  const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+  const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+  return tb - ta
+}
+
+function packagePrimaryLabel(u: UploadPackageRow): string {
+  const files = u.upload_files || []
+  const first = files[0]
+  if (!first) return 'Upload'
+  if (files.length === 1) return first.original_name
+  return `${first.original_name} (+${files.length - 1} more)`
+}
+
+type InsightsWizard =
+  | { phase: 'idle' }
+  | {
+      phase: 'running'
+      rubricLabel: string
+      reportLabel: string
+      rubricUploadId: string
+      reportUploadId: string
+      reportFileId: string
+    }
+
+function reportOptionValue(uploadId: string, fileId: string) {
+  return `${uploadId}:${fileId}`
+}
+
 export function FileShareDashboard() {
   const {
     initialUploads,
@@ -85,10 +107,19 @@ export function FileShareDashboard() {
   const [showResult, setShowResult] = useState(false)
   const [lastBatchMeta, setLastBatchMeta] = useState('')
   const [toast, setToast] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmTarget | null>(null)
   const [teamDeleteConfirm, setTeamDeleteConfirm] = useState<TeamDeleteConfirmTarget | null>(null)
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null)
+  const [insightsWizard, setInsightsWizard] = useState<InsightsWizard>({ phase: 'idle' })
+  const [insightsResult, setInsightsResult] = useState<{
+    comment: string
+    scorePercent: number
+    rubricLabel: string
+    reportLabel: string
+  } | null>(null)
+  const insightsAbortRef = useRef<AbortController | null>(null)
+  const activeTeamIdRef = useRef(activeTeamId)
+  const [selectedRubricUploadId, setSelectedRubricUploadId] = useState('')
+  const [selectedReportValue, setSelectedReportValue] = useState('')
 
   const queueBytes = useMemo(() => queue.reduce((a, f) => a + f.size, 0), [queue])
 
@@ -130,40 +161,180 @@ export function FileShareDashboard() {
     [showToast],
   )
 
-  const downloadFile = useCallback(
-    async (storagePath: string, filename: string) => {
-      if (!supabaseBrowser) {
-        showToast('Supabase is not configured.')
-        return
+  const rubricPackages = useMemo(() => {
+    return initialUploads
+      .filter((u) => u.is_rubric && (u.upload_files?.length ?? 0) > 0)
+      .sort(sortPackagesByCreatedDesc)
+  }, [initialUploads])
+
+  const reportPackages = useMemo(() => {
+    return initialUploads
+      .filter((u) => !u.is_rubric && (u.upload_files?.length ?? 0) > 0)
+      .sort(sortPackagesByCreatedDesc)
+  }, [initialUploads])
+
+  const reportOptions = useMemo(() => {
+    const rows: { uploadId: string; fileId: string; label: string; fileName: string }[] = []
+    for (const u of reportPackages) {
+      for (const f of u.upload_files || []) {
+        rows.push({
+          uploadId: u.id,
+          fileId: f.id,
+          fileName: f.original_name,
+          label: `${f.original_name} · ${formatShortDate(u.created_at)}`,
+        })
       }
-      const { data, error } = await supabaseBrowser.storage.from('uploads').createSignedUrl(storagePath, 3600)
-      if (error || !data?.signedUrl) {
-        showToast('Could not download file.')
-        return
-      }
-      const a = document.createElement('a')
-      a.href = data.signedUrl
-      a.download = filename
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-    },
-    [showToast],
-  )
+    }
+    return rows
+  }, [reportPackages])
+
+  const hasReportUploads = reportPackages.length > 0
+  const hasRubricUploads = rubricPackages.length > 0
 
   useEffect(() => {
-    if (!deleteConfirm && !teamDeleteConfirm) return
+    activeTeamIdRef.current = activeTeamId
+  }, [activeTeamId])
+
+  useEffect(() => {
+    insightsAbortRef.current?.abort()
+    insightsAbortRef.current = null
+    setInsightsWizard({ phase: 'idle' })
+    setInsightsResult(null)
+  }, [activeTeamId])
+
+  useEffect(() => {
+    if (rubricPackages.length === 0) {
+      setSelectedRubricUploadId('')
+      return
+    }
+    setSelectedRubricUploadId((prev) =>
+      rubricPackages.some((p) => p.id === prev) ? prev : rubricPackages[0].id,
+    )
+  }, [rubricPackages])
+
+  useEffect(() => {
+    if (reportOptions.length === 0) {
+      setSelectedReportValue('')
+      return
+    }
+    setSelectedReportValue((prev) =>
+      reportOptions.some((r) => reportOptionValue(r.uploadId, r.fileId) === prev)
+        ? prev
+        : reportOptionValue(reportOptions[0].uploadId, reportOptions[0].fileId),
+    )
+  }, [reportOptions])
+
+  useEffect(() => {
+    if (!teamDeleteConfirm) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (deletingId || deletingTeamId) return
-      setDeleteConfirm(null)
+      if (deletingTeamId) return
       setTeamDeleteConfirm(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [deleteConfirm, teamDeleteConfirm, deletingId, deletingTeamId])
+  }, [teamDeleteConfirm, deletingTeamId])
+
+  useEffect(() => {
+    if (insightsWizard.phase !== 'running') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      insightsAbortRef.current?.abort()
+      insightsAbortRef.current = null
+      setInsightsWizard({ phase: 'idle' })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [insightsWizard.phase])
+
+  const startGenerateInsights = useCallback(() => {
+    if (!activeTeamId) return
+    if (reportOptions.length === 0) return
+    if (rubricPackages.length === 0) {
+      showToast('Please upload a rubric first.')
+      return
+    }
+    const rubricPkg = rubricPackages.find((p) => p.id === selectedRubricUploadId) ?? rubricPackages[0]
+    const reportParts = selectedReportValue.split(':')
+    const reportUploadId = reportParts[0]
+    const reportFileId = reportParts[1]
+    if (!reportUploadId || !reportFileId) return
+    const reportRow = reportOptions.find(
+      (r) => r.uploadId === reportUploadId && r.fileId === reportFileId,
+    )
+    if (!reportRow) return
+
+    const rubricLabel = packagePrimaryLabel(rubricPkg)
+    const reportLabel = reportRow.fileName
+    const teamSnapshot = activeTeamId
+
+    insightsAbortRef.current?.abort()
+    const ac = new AbortController()
+    insightsAbortRef.current = ac
+
+    setInsightsWizard({
+      phase: 'running',
+      rubricLabel,
+      reportLabel,
+      rubricUploadId: rubricPkg.id,
+      reportUploadId: reportRow.uploadId,
+      reportFileId: reportRow.fileId,
+    })
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/ai/insights-rubric-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          signal: ac.signal,
+          body: JSON.stringify({
+            rubricUploadId: rubricPkg.id,
+            reportFileId: reportRow.fileId,
+          }),
+        })
+        const text = await res.text()
+        let payload: { error?: string; comment?: string; scorePercent?: unknown } = {}
+        try {
+          payload = JSON.parse(text) as typeof payload
+        } catch {
+          showToast('Unexpected response from server.')
+          return
+        }
+        if (!res.ok) {
+          showToast(typeof payload.error === 'string' ? payload.error : 'Could not generate insights.')
+          return
+        }
+        const score = Number(payload.scorePercent)
+        if (typeof payload.comment !== 'string' || !payload.comment.trim() || !Number.isFinite(score)) {
+          showToast('Invalid insights response.')
+          return
+        }
+        if (ac.signal.aborted || activeTeamIdRef.current !== teamSnapshot) return
+        const clamped = Math.min(100, Math.max(0, Math.round(score)))
+        setInsightsResult({
+          comment: payload.comment.trim(),
+          scorePercent: clamped,
+          rubricLabel,
+          reportLabel,
+        })
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+        if (e instanceof Error && e.name === 'AbortError') return
+        showToast('Network error while generating insights.')
+      } finally {
+        if (insightsAbortRef.current === ac) insightsAbortRef.current = null
+        setInsightsWizard({ phase: 'idle' })
+      }
+    })()
+  }, [
+    activeTeamId,
+    reportOptions,
+    rubricPackages,
+    selectedRubricUploadId,
+    selectedReportValue,
+    showToast,
+  ])
 
   useEffect(() => {
     const supabase = supabaseBrowser
@@ -334,51 +505,6 @@ export function FileShareDashboard() {
     }
   }
 
-  const runDeleteSharedFile = async (target: DeleteConfirmTarget) => {
-    if (!supabaseBrowser) {
-      showToast('Supabase is not configured.')
-      return
-    }
-    setDeletingId(target.fileId)
-    try {
-      const { error: storageErr } = await supabaseBrowser.storage.from('uploads').remove([target.storagePath])
-      if (storageErr) {
-        console.warn('[uploads] storage remove:', storageErr.message)
-      }
-
-      const { data: deletedRows, error: fileErr } = await supabaseBrowser
-        .from('upload_files')
-        .delete()
-        .eq('id', target.fileId)
-        .select('id')
-
-      if (fileErr) throw fileErr
-      if (!deletedRows?.length) {
-        throw new Error(
-          'Delete did not remove any file. You are not the owner of this file.',
-        )
-      }
-
-      const { data: remaining } = await supabaseBrowser
-        .from('upload_files')
-        .select('id')
-        .eq('upload_id', target.uploadId)
-        .limit(1)
-      if (!remaining?.length) {
-        const { error: uploadErr } = await supabaseBrowser.from('uploads').delete().eq('id', target.uploadId)
-        if (uploadErr) console.warn('[uploads] delete package:', uploadErr.message)
-      }
-
-      setDeleteConfirm(null)
-      showToast('File deleted.')
-      router.refresh()
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Delete failed.')
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
   const runDeleteTeam = async (target: TeamDeleteConfirmTarget) => {
     if (!supabaseBrowser) {
       showToast('Supabase is not configured.')
@@ -399,123 +525,8 @@ export function FileShareDashboard() {
     }
   }
 
-  const shareListBody =
-    initialUploads.length === 0 ? (
-      <div className="empty-state">No files yet. Upload a PDF or DOCX and it will show up here.</div>
-    ) : (
-      initialUploads.map((u) => {
-        const files = u.upload_files || []
-        const total = files.reduce((s, f) => s + (typeof f.size === 'number' ? f.size : 0), 0)
-
-        return (
-          <div key={u.id} className="share-item">
-            <div className="share-head">
-              <div>
-                <div className="share-title">
-                  {files.length} file{files.length === 1 ? '' : 's'} • {fmtSize(total)}
-                  {u.is_rubric ? (
-                    <span className="share-rubric-badge" title="Marked as rubric">
-                      Rubric
-                    </span>
-                  ) : null}
-                </div>
-                <div className="share-sub">
-                  {u.uploader_email ?? 'Unknown'} • {formatShortDate(u.created_at)}
-                  {u.note ? ` • ${u.note}` : ''}
-                </div>
-              </div>
-            </div>
-            <div className="share-file-rows">
-              {files.map((f) => {
-                const size = typeof f.size === 'number' ? f.size : 0
-                return (
-                  <div key={f.id} className="file-row share-file-row">
-                    <div className="file-row-left">
-                      <div className="file-badge">{ext(f.original_name)}</div>
-                      <div>
-                        <div className="file-name">{f.original_name}</div>
-                        <div className="file-meta">{fmtSize(size)}</div>
-                      </div>
-                    </div>
-                    <div className="share-file-actions">
-                      {supabaseBrowser ? (
-                        <button
-                          type="button"
-                          className="mini-btn download-link"
-                          onClick={() => void downloadFile(f.storage_path, f.original_name)}
-                        >
-                          Download
-                        </button>
-                      ) : (
-                        <span className="share-sub" style={{ flexShrink: 0 }}>
-                          Unavailable
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        className="file-remove share-file-delete"
-                        disabled={deletingId === f.id}
-                        aria-label={`Delete ${f.original_name}`}
-                        onClick={() =>
-                          setDeleteConfirm({
-                            uploadId: u.id,
-                            fileId: f.id,
-                            storagePath: f.storage_path,
-                            originalName: f.original_name,
-                          })
-                        }
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })
-    )
-
   return (
     <>
-      {deleteConfirm ? (
-        <div
-          className="confirm-overlay"
-          role="presentation"
-          onClick={() => setDeleteConfirm(null)}
-        >
-          <div
-            className="confirm-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="delete-dialog-title" className="confirm-dialog-title">
-              Delete this file?
-            </h2>
-            <p className="confirm-dialog-body">
-              <strong>{deleteConfirm.originalName}</strong> will be removed from storage and the database. This
-              cannot be undone.
-            </p>
-            <div className="confirm-dialog-actions">
-              <button type="button" className="secondary-btn" onClick={() => setDeleteConfirm(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="confirm-dialog-delete"
-                disabled={deletingId === deleteConfirm.fileId}
-                onClick={() => void runDeleteSharedFile(deleteConfirm)}
-              >
-                {deletingId === deleteConfirm.fileId ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {teamDeleteConfirm ? (
         <div
           className="confirm-overlay"
@@ -564,7 +575,7 @@ export function FileShareDashboard() {
         <div className="hero-inner">
           <div>
             <h1>
-              Upload files and
+              Upload reports and
               <br />
                get AI-powered insights.
             </h1>
@@ -708,7 +719,7 @@ export function FileShareDashboard() {
             <div className="result-box" id="share-result" style={{ display: showResult ? 'block' : 'none' }}>
               <div className="result-head">Upload complete</div>
               <div className="helper" id="share-meta-text">
-                {lastBatchMeta || 'Your files are listed in Shared files.'}
+                {lastBatchMeta || 'Your files are ready — open Insights to generate a report.'}
               </div>
             </div>
           </div>
@@ -716,11 +727,123 @@ export function FileShareDashboard() {
 
         <section className="card card--accent-gold">
           <div className="card-header">
-            <div className="card-title">📥 Insights </div>
+            <div className="card-title">📥 Insights</div>
           </div>
           <div className="card-body">
-            <div className="share-list" id="share-list">
-              {shareListBody}
+            <div className="insights-panel" id="insights-panel">
+              {!activeTeamId ? (
+                <p className="insights-placeholder insights-placeholder--muted">
+                  Select a team in the sidebar to use insights.
+                </p>
+              ) : insightsWizard.phase === 'running' ? (
+                <>
+                  <div className="insights-running-rows">
+                    <div className="insights-running-line">
+                      <span className="insights-running-label">Rubric</span>
+                      <span className="insights-running-value">{insightsWizard.rubricLabel}</span>
+                    </div>
+                    <div className="insights-running-line">
+                      <span className="insights-running-label">Report</span>
+                      <span className="insights-running-value">{insightsWizard.reportLabel}</span>
+                    </div>
+                  </div>
+                  <div className="insights-spinner-wrap" aria-live="polite">
+                    <div className="insights-spinner" />
+                    <p className="insights-spinner-text">Generating insights…</p>
+                    <p className="insights-spinner-hint">Press Esc to cancel</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {insightsResult ? (
+                    <div className="insights-result">
+                      <div className="insights-result-top">
+                        <div className="insights-score-block" aria-label="Rubric alignment score">
+                          <span className="insights-score-number">{insightsResult.scorePercent}</span>
+                          <span className="insights-score-percent">%</span>
+                        </div>
+                        <div className="insights-result-headlines">
+                          <div className="insights-result-pair">
+                            <span className="insights-result-pair-label">Rubric</span>
+                            <span className="insights-result-pair-value">{insightsResult.rubricLabel}</span>
+                          </div>
+                          <div className="insights-result-pair">
+                            <span className="insights-result-pair-label">Report</span>
+                            <span className="insights-result-pair-value">{insightsResult.reportLabel}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="secondary-btn insights-result-dismiss"
+                          onClick={() => setInsightsResult(null)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                      <p className="insights-comment">{insightsResult.comment}</p>
+                    </div>
+                  ) : null}
+                  <p className="insights-placeholder">Upload a report to gain some insights</p>
+                  <div className="insights-select-row">
+                    <div className="insights-select-field">
+                      <label className="insights-select-label" htmlFor="insights-rubric-select">
+                        Rubric
+                      </label>
+                      <select
+                        id="insights-rubric-select"
+                        className="insights-select"
+                        value={selectedRubricUploadId}
+                        onChange={(e) => setSelectedRubricUploadId(e.target.value)}
+                        disabled={!hasRubricUploads}
+                      >
+                        {!hasRubricUploads ? (
+                          <option value="">No rubrics uploaded yet</option>
+                        ) : (
+                          rubricPackages.map((pkg) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {packagePrimaryLabel(pkg)} · {formatShortDate(pkg.created_at)}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                    <div className="insights-select-field">
+                      <label className="insights-select-label" htmlFor="insights-report-select">
+                        Report
+                      </label>
+                      <select
+                        id="insights-report-select"
+                        className="insights-select"
+                        value={selectedReportValue}
+                        onChange={(e) => setSelectedReportValue(e.target.value)}
+                        disabled={!hasReportUploads}
+                      >
+                        {!hasReportUploads ? (
+                          <option value="">No reports uploaded yet</option>
+                        ) : (
+                          reportOptions.map((row) => (
+                            <option
+                              key={reportOptionValue(row.uploadId, row.fileId)}
+                              value={reportOptionValue(row.uploadId, row.fileId)}
+                            >
+                              {row.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                  {hasReportUploads ? (
+                    <button
+                      type="button"
+                      className="primary-btn insights-generate-btn"
+                      onClick={startGenerateInsights}
+                    >
+                      Generate insights
+                    </button>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </section>
