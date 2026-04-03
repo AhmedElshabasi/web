@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'NoRedundancy — File Share',
+  title: 'NoRedundancy',
   description: 'AI-powered Report Insights',
 }
 
