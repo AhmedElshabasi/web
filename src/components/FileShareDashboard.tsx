@@ -564,9 +564,9 @@ export function FileShareDashboard() {
         <div className="hero-inner">
           <div>
             <h1>
-              Share files
+              Upload files and
               <br />
-              without the clutter.
+               get AI-powered insights.
             </h1>
             <p>
               Upload PDF and DOCX files only. Files are visible only to members of the team you select in the sidebar.

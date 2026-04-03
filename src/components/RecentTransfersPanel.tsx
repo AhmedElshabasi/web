@@ -404,11 +404,10 @@ export function RecentTransfersPanel() {
       <section className="rt-hero">
         <div className="rt-hero-inner">
           <div>
-            <div className="rt-kicker">Transfer intelligence</div>
+            
             <h1>Uploads</h1>
             <p>
-              Track every file handoff, see what got opened, and catch links that are about to die before someone pings
-              you saying the download is broken.
+              Track every file handoff, see what got uploaded, and manage your files all in one place.
             </p>
           </div>
           <div className="rt-live-chip">
