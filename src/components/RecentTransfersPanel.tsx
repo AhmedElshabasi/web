@@ -210,7 +210,7 @@ export function RecentTransfersPanel() {
         if (fileErr) throw fileErr
         if (!deletedRows?.length) {
           throw new Error(
-            'Delete did not remove any file. You are not the owner of this file.',
+            'Delete did not remove any file. You are don\'t have permissions to delete this file.',
           )
         }
 

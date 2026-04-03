@@ -63,6 +63,17 @@ function isAllowedFile(file: File) {
   return false
 }
 
+function isPdfUploadFile(f: UploadFileRow) {
+  const m = (f.mime || '').toLowerCase()
+  if (m === 'application/pdf') return true
+  return ext(f.original_name) === 'PDF'
+}
+
+type PdfSummaryModal =
+  | { status: 'loading'; fileId: string; fileName: string }
+  | { status: 'done'; fileId: string; fileName: string; summary: string; truncated?: boolean; model?: string }
+  | { status: 'error'; fileId: string; fileName: string; message: string }
+
 export function FileShareDashboard() {
   const {
     initialUploads,
@@ -89,6 +100,7 @@ export function FileShareDashboard() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmTarget | null>(null)
   const [teamDeleteConfirm, setTeamDeleteConfirm] = useState<TeamDeleteConfirmTarget | null>(null)
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null)
+  const [pdfSummaryModal, setPdfSummaryModal] = useState<PdfSummaryModal | null>(null)
 
   const queueBytes = useMemo(() => queue.reduce((a, f) => a + f.size, 0), [queue])
 
@@ -164,6 +176,60 @@ export function FileShareDashboard() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [deleteConfirm, teamDeleteConfirm, deletingId, deletingTeamId])
+
+  useEffect(() => {
+    if (!pdfSummaryModal) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPdfSummaryModal(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pdfSummaryModal])
+
+  const requestPdfSummary = useCallback(async (fileId: string, fileName: string) => {
+    setPdfSummaryModal({ status: 'loading', fileId, fileName })
+    try {
+      const res = await fetch('/api/ai/summarize-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId }),
+      })
+      const data = (await res.json()) as {
+        summary?: string
+        error?: string
+        truncated?: boolean
+        model?: string
+      }
+      if (!res.ok) {
+        setPdfSummaryModal({
+          status: 'error',
+          fileId,
+          fileName,
+          message: data.error || 'Could not summarize PDF',
+        })
+        return
+      }
+      if (!data.summary) {
+        setPdfSummaryModal({ status: 'error', fileId, fileName, message: 'No summary returned' })
+        return
+      }
+      setPdfSummaryModal({
+        status: 'done',
+        fileId,
+        fileName,
+        summary: data.summary,
+        truncated: data.truncated,
+        model: data.model,
+      })
+    } catch (e: unknown) {
+      setPdfSummaryModal({
+        status: 'error',
+        fileId,
+        fileName,
+        message: e instanceof Error ? e.message : 'Network error',
+      })
+    }
+  }, [])
 
   useEffect(() => {
     const supabase = supabaseBrowser
@@ -355,7 +421,7 @@ export function FileShareDashboard() {
       if (fileErr) throw fileErr
       if (!deletedRows?.length) {
         throw new Error(
-          'Delete did not remove any file. You are not the owner of this file.',
+          'Delete did not remove any file. You don\'t have permissions to delete this file.',
         )
       }
 
@@ -451,6 +517,20 @@ export function FileShareDashboard() {
                           Unavailable
                         </span>
                       )}
+                      {isPdfUploadFile(f) ? (
+                        <button
+                          type="button"
+                          className="mini-btn pdf-summary-btn"
+                          disabled={
+                            pdfSummaryModal?.status === 'loading' && pdfSummaryModal.fileId === f.id
+                          }
+                          onClick={() => void requestPdfSummary(f.id, f.original_name)}
+                        >
+                          {pdfSummaryModal?.status === 'loading' && pdfSummaryModal.fileId === f.id
+                            ? 'Summarizing…'
+                            : 'AI summary'}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="file-remove share-file-delete"
@@ -554,6 +634,53 @@ export function FileShareDashboard() {
                 onClick={() => void runDeleteTeam(teamDeleteConfirm)}
               >
                 {deletingTeamId === teamDeleteConfirm.id ? 'Deleting…' : 'Delete team'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pdfSummaryModal ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onClick={() => setPdfSummaryModal(null)}
+        >
+          <div
+            className="confirm-dialog pdf-summary-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-summary-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="pdf-summary-title" className="confirm-dialog-title">
+              AI summary
+            </h2>
+            <p className="confirm-dialog-body" style={{ marginBottom: 12 }}>
+              <strong>{pdfSummaryModal.fileName}</strong>
+              {pdfSummaryModal.status === 'done' && pdfSummaryModal.truncated ? (
+                <span style={{ display: 'block', marginTop: 8, fontWeight: 400, opacity: 0.85 }}>
+                  Only the start of the document was sent to the model because of length limits.
+                </span>
+              ) : null}
+            </p>
+            {pdfSummaryModal.status === 'loading' ? (
+              <p className="pdf-summary-status">Extracting text and calling the model…</p>
+            ) : null}
+            {pdfSummaryModal.status === 'error' ? (
+              <p className="pdf-summary-error">{pdfSummaryModal.message}</p>
+            ) : null}
+            {pdfSummaryModal.status === 'done' ? (
+              <>
+                {pdfSummaryModal.model ? (
+                  <p className="pdf-summary-model-meta">Model: {pdfSummaryModal.model}</p>
+                ) : null}
+                <div className="pdf-summary-body">{pdfSummaryModal.summary}</div>
+              </>
+            ) : null}
+            <div className="confirm-dialog-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="secondary-btn" onClick={() => setPdfSummaryModal(null)}>
+                Close
               </button>
             </div>
           </div>

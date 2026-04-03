@@ -1314,6 +1314,54 @@
   cursor: wait;
 }
 
+#main-page-root .confirm-dialog.pdf-summary-dialog {
+  max-width: min(720px, 94vw);
+  max-height: min(88vh, 920px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#main-page-root .pdf-summary-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#main-page-root .pdf-summary-status {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+#main-page-root .pdf-summary-error {
+  font-size: 14px;
+  color: var(--red);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+#main-page-root .pdf-summary-model-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  font-family: var(--mono);
+}
+
+#main-page-root .pdf-summary-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 /* —— Uploads —— */
 #main-page-root .recent-transfers-page {
   display: flex;
