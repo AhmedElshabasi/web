@@ -4,6 +4,10 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import type {
+  RubricInsightNeedsAttentionItem,
+  RubricInsightQuickBreakdown,
+} from '@/types/rubricInsights'
 import type { UploadPackageRow, UploadReportStatus } from '@/types/uploadWorkspace'
 import { UPLOAD_REPORT_STATUS_LABELS } from '@/types/uploadWorkspace'
 
@@ -117,6 +121,9 @@ export function FileShareDashboard() {
     scorePercent: number
     rubricLabel: string
     reportLabel: string
+    overallCompletionPercent?: number
+    needsAttention: RubricInsightNeedsAttentionItem[]
+    quickBreakdown: RubricInsightQuickBreakdown | null
   } | null>(null)
   const insightsAbortRef = useRef<AbortController | null>(null)
   const activeTeamIdRef = useRef(activeTeamId)
@@ -296,7 +303,17 @@ export function FileShareDashboard() {
           }),
         })
         const text = await res.text()
-        let payload: { error?: string; comment?: string; scorePercent?: unknown } = {}
+        let payload: {
+          error?: string
+          comment?: string
+          scorePercent?: unknown
+          needsAttention?: unknown
+          quickBreakdown?: unknown
+          rubricLabel?: string
+          reportLabel?: string
+          persisted?: boolean
+          persistErrors?: string[]
+        } = {}
         try {
           payload = JSON.parse(text) as typeof payload
         } catch {
@@ -314,11 +331,53 @@ export function FileShareDashboard() {
         }
         if (ac.signal.aborted || activeTeamIdRef.current !== teamSnapshot) return
         const clamped = Math.min(100, Math.max(0, Math.round(score)))
+        const commentText = payload.comment.trim()
+
+        const needsAttention = Array.isArray(payload.needsAttention)
+          ? (payload.needsAttention as RubricInsightNeedsAttentionItem[])
+          : []
+
+        let quickBreakdown: RubricInsightQuickBreakdown | null = null
+        const qb = payload.quickBreakdown
+        if (qb && typeof qb === 'object' && qb !== null) {
+          const o = qb as Record<string, unknown>
+          const ocp = Number(o.overallCompletionPercent)
+          if (
+            Number.isFinite(ocp) &&
+            typeof o.synthesis === 'string' &&
+            typeof o.gapsAndRisks === 'string' &&
+            Array.isArray(o.contributors)
+          ) {
+            quickBreakdown = {
+              overallCompletionPercent: Math.min(100, Math.max(0, Math.round(ocp))),
+              contributors: (o.contributors as { label?: string; appearsToBeWorkingOn?: string; inferredFromNotesOrDocs?: string | null }[])
+                .filter((c) => typeof c?.label === 'string' && typeof c?.appearsToBeWorkingOn === 'string')
+                .map((c) => ({
+                  label: c.label!,
+                  appearsToBeWorkingOn: c.appearsToBeWorkingOn!,
+                  inferredFromNotesOrDocs: c.inferredFromNotesOrDocs ?? null,
+                })),
+              synthesis: o.synthesis as string,
+              gapsAndRisks: o.gapsAndRisks as string,
+            }
+          }
+        }
+
+        if (payload.persisted === false) {
+          const detail = payload.persistErrors?.length ? ` (${payload.persistErrors[0]})` : ''
+          showToast(`Insights ready, but saving to the team failed${detail}.`)
+        }
+
+        router.refresh()
+
         setInsightsResult({
-          comment: payload.comment.trim(),
+          comment: commentText,
           scorePercent: clamped,
-          rubricLabel,
-          reportLabel,
+          rubricLabel: typeof payload.rubricLabel === 'string' ? payload.rubricLabel : rubricLabel,
+          reportLabel: typeof payload.reportLabel === 'string' ? payload.reportLabel : reportLabel,
+          overallCompletionPercent: quickBreakdown?.overallCompletionPercent,
+          needsAttention,
+          quickBreakdown,
         })
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return
@@ -332,6 +391,7 @@ export function FileShareDashboard() {
   }, [
     activeTeamId,
     reportOptions,
+    router,
     rubricPackages,
     selectedRubricUploadId,
     selectedReportValue,
@@ -801,6 +861,54 @@ export function FileShareDashboard() {
                         </button>
                       </div>
                       <p className="insights-comment">{insightsResult.comment}</p>
+                      {typeof insightsResult.overallCompletionPercent === 'number' ? (
+                        <div className="insights-team-completion">
+                          <span className="insights-team-completion-label">Team rubric completion (all linked work)</span>
+                          <span className="insights-team-completion-value">
+                            {insightsResult.overallCompletionPercent}%
+                          </span>
+                        </div>
+                      ) : null}
+                      {insightsResult.needsAttention.length > 0 ? (
+                        <div className="insights-subsection">
+                          <div className="insights-subsection-title">Needs attention</div>
+                          <ul className="insights-attention-list">
+                            {insightsResult.needsAttention.map((item, i) => (
+                              <li key={`${item.fileLabel}-${i}`} className="insights-attention-item">
+                                <div className="insights-attention-file">{item.fileLabel}</div>
+                                <div className="insights-attention-reason">{item.reason}</div>
+                                {item.severity ? (
+                                  <span className={`insights-severity insights-severity--${item.severity}`}>
+                                    {item.severity}
+                                  </span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {insightsResult.quickBreakdown ? (
+                        <div className="insights-subsection">
+                          <div className="insights-subsection-title">Quick breakdown</div>
+                          <p className="insights-breakdown-text">{insightsResult.quickBreakdown.synthesis}</p>
+                          <p className="insights-breakdown-text insights-breakdown-text--muted">
+                            {insightsResult.quickBreakdown.gapsAndRisks}
+                          </p>
+                          {insightsResult.quickBreakdown.contributors.length > 0 ? (
+                            <ul className="insights-contributors">
+                              {insightsResult.quickBreakdown.contributors.map((c, idx) => (
+                                <li key={`${c.label}-${idx}`} className="insights-contributor">
+                                  <div className="insights-contributor-label">{c.label}</div>
+                                  <div className="insights-contributor-on">{c.appearsToBeWorkingOn}</div>
+                                  {c.inferredFromNotesOrDocs ? (
+                                    <div className="insights-contributor-hint">{c.inferredFromNotesOrDocs}</div>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                   <p className="insights-placeholder">Upload a report to gain some insights</p>

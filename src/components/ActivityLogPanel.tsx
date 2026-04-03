@@ -1,4 +1,180 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
+import type { ActivityLogPayload, ActivityTimelineItem } from '@/types/activityLog'
+import type { UploadPackageRow } from '@/types/uploadWorkspace'
+
+function sortPackagesByCreatedDesc(a: UploadPackageRow, b: UploadPackageRow) {
+  const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+  const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+  return tb - ta
+}
+
+function packagePrimaryLabel(u: UploadPackageRow): string {
+  const files = u.upload_files || []
+  const first = files[0]
+  if (!first) return 'Upload'
+  if (files.length === 1) return first.original_name
+  return `${first.original_name} (+${files.length - 1} more)`
+}
+
+function formatShortDate(iso: string | null) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function isSameLocalDay(iso: string): boolean {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return false
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+function timelineIcon(kind: ActivityTimelineItem['kind']): string {
+  switch (kind) {
+    case 'insight':
+      return '✦'
+    case 'note':
+      return '✎'
+    case 'file_deleted':
+      return '⌫'
+    default:
+      return '•'
+  }
+}
+
+function timelineKindLabel(kind: ActivityTimelineItem['kind']): string {
+  switch (kind) {
+    case 'insight':
+      return 'AI insight'
+    case 'note':
+      return 'Note'
+    case 'file_deleted':
+      return 'Delete'
+    default:
+      return 'Event'
+  }
+}
+
 export function ActivityLogPanel() {
+  const { initialUploads, activeTeamId } = useUploadsWorkspace()
+
+  const rubricPackages = useMemo(() => {
+    return initialUploads
+      .filter((u) => u.is_rubric && (u.upload_files?.length ?? 0) > 0)
+      .sort(sortPackagesByCreatedDesc)
+  }, [initialUploads])
+
+  const [selectedRubricId, setSelectedRubricId] = useState('')
+  const [logData, setLogData] = useState<ActivityLogPayload | null>(null)
+  const [logLoading, setLogLoading] = useState(false)
+  const [logError, setLogError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [kindFilter, setKindFilter] = useState<'all' | ActivityTimelineItem['kind']>('all')
+  const [severityFilter, setSeverityFilter] = useState<'all' | ActivityTimelineItem['badge']>('all')
+
+  useEffect(() => {
+    if (rubricPackages.length === 0) {
+      setSelectedRubricId('')
+      return
+    }
+    setSelectedRubricId((prev) =>
+      rubricPackages.some((p) => p.id === prev) ? prev : rubricPackages[0].id,
+    )
+  }, [rubricPackages])
+
+  const loadLog = useCallback(async () => {
+    if (!activeTeamId || !selectedRubricId) {
+      setLogData(null)
+      setLogError(null)
+      return
+    }
+    setLogLoading(true)
+    setLogError(null)
+    try {
+      const res = await fetch(
+        `/api/activity-log?rubricUploadId=${encodeURIComponent(selectedRubricId)}`,
+        { credentials: 'include' },
+      )
+      const text = await res.text()
+      let json: unknown
+      try {
+        json = JSON.parse(text)
+      } catch {
+        setLogError('Invalid response from server.')
+        setLogData(null)
+        return
+      }
+      if (!res.ok) {
+        const err = json as { error?: string }
+        setLogError(err.error || 'Could not load activity log.')
+        setLogData(null)
+        return
+      }
+      setLogData(json as ActivityLogPayload)
+    } catch {
+      setLogError('Network error loading activity log.')
+      setLogData(null)
+    } finally {
+      setLogLoading(false)
+    }
+  }, [activeTeamId, selectedRubricId])
+
+  useEffect(() => {
+    void loadLog()
+  }, [loadLog])
+
+  const filteredTimeline = useMemo(() => {
+    const list = logData?.timeline ?? []
+    let out = list
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      out = out.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          item.meta.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q),
+      )
+    }
+    if (kindFilter !== 'all') {
+      out = out.filter((item) => item.kind === kindFilter)
+    }
+    if (severityFilter !== 'all') {
+      out = out.filter((item) => item.badge === severityFilter)
+    }
+    return out
+  }, [logData, searchQuery, kindFilter, severityFilter])
+
+  const stats = useMemo(() => {
+    const timeline = logData?.timeline ?? []
+    const eventsToday = timeline.filter((t) => isSameLocalDay(t.at)).length
+    const attention =
+      (logData?.needsAttention.fromAi.length ?? 0) + (logData?.needsAttention.fromNotes.length ?? 0)
+    const authors = new Set<string>()
+    for (const t of timeline) {
+      const m = t.meta.split('·')[0]?.trim()
+      if (m) authors.add(m)
+    }
+    return {
+      eventsToday,
+      attention,
+      authors: authors.size,
+      deletes: timeline.filter((t) => t.kind === 'file_deleted').length,
+    }
+  }, [logData])
+
+  const hasRubrics = rubricPackages.length > 0
+
   return (
     <div className="activity-log-page">
       <section className="al-hero">
@@ -11,9 +187,30 @@ export function ActivityLogPanel() {
               who touched what, and whether it matters.
             </p>
           </div>
-          <div className="al-live-chip">
-            <span className="al-live-dot" />
-            Live audit trail
+          <div className="al-rubric-dropdown-wrap">
+            <label className="al-rubric-dropdown-label" htmlFor="al-rubric-select">
+              Rubric
+            </label>
+            <select
+              id="al-rubric-select"
+              className="al-rubric-dropdown"
+              aria-label="Choose rubric"
+              value={selectedRubricId}
+              onChange={(e) => setSelectedRubricId(e.target.value)}
+              disabled={!activeTeamId || !hasRubrics}
+            >
+              {!activeTeamId ? (
+                <option value="">Select a team in the sidebar</option>
+              ) : !hasRubrics ? (
+                <option value="">No rubrics uploaded yet</option>
+              ) : (
+                rubricPackages.map((pkg) => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {packagePrimaryLabel(pkg)} · {formatShortDate(pkg.created_at)}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
         </div>
       </section>
@@ -23,77 +220,73 @@ export function ActivityLogPanel() {
           <div className="card-header">
             <div className="card-title">🕘 Timeline</div>
             <div className="al-toolbar">
-              <input className="al-search" type="text" placeholder="Search file, user, or action" readOnly />
-              <select className="al-filter" defaultValue="all-events">
-                <option value="all-events">All events</option>
-                <option value="uploads">Uploads</option>
-                <option value="shares">Shares</option>
-                <option value="opens">Opens</option>
-                <option value="expired">Expired links</option>
-                <option value="failed">Failed access</option>
+              <input
+                className="al-search"
+                type="search"
+                placeholder="Search title, people, or details"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Filter timeline"
+              />
+              <select
+                className="al-filter"
+                value={kindFilter}
+                onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+                aria-label="Filter by event type"
+              >
+                <option value="all">All types</option>
+                <option value="insight">AI insights</option>
+                <option value="note">Notes</option>
+                <option value="file_deleted">File deletes</option>
               </select>
-              <select className="al-filter" defaultValue="all-sev">
-                <option value="all-sev">All severity</option>
+              <select
+                className="al-filter"
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value as typeof severityFilter)}
+                aria-label="Filter by badge"
+              >
+                <option value="all">All badges</option>
                 <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="critical">Critical</option>
+                <option value="success">Success</option>
+                <option value="warn">Warning</option>
+                <option value="danger">Critical</option>
               </select>
+              <button type="button" className="secondary-btn al-refresh-btn" onClick={() => void loadLog()}>
+                Refresh
+              </button>
             </div>
           </div>
           <div className="card-body">
+            {logError ? (
+              <div className="empty-state" style={{ margin: 16, borderColor: 'var(--red)' }}>
+                {logError}
+              </div>
+            ) : null}
+            {logLoading ? (
+              <p className="al-loading">Loading activity…</p>
+            ) : null}
             <div className="activity-timeline">
-              <div className="activity-item">
-                <div className="activity-icon info">↗</div>
-                <div className="activity-content">
-                  <div className="activity-top">
-                    <div>
-                      <div className="activity-title">Share link created</div>
-                      <div className="activity-meta">Maria Lee • Capstone_Final_Report.pdf • 2:14 PM</div>
+              {!logLoading && !logError && filteredTimeline.length === 0 ? (
+                <p className="al-empty-timeline">
+                  No events for this rubric yet. Generate insights, add notes on linked reports, or remove files to see
+                  activity here.
+                </p>
+              ) : null}
+              {filteredTimeline.map((item) => (
+                <div key={item.id} className="activity-item">
+                  <div className={`activity-icon ${item.badge}`}>{timelineIcon(item.kind)}</div>
+                  <div className="activity-content">
+                    <div className="activity-top">
+                      <div>
+                        <div className="activity-title">{item.title}</div>
+                        <div className="activity-meta">{item.meta}</div>
+                      </div>
+                      <span className={`activity-badge ${item.badge}`}>{timelineKindLabel(item.kind)}</span>
                     </div>
-                    <span className="activity-badge info">Info</span>
+                    {item.description ? <div className="activity-desc">{item.description}</div> : null}
                   </div>
-                  <div className="activity-desc">Created link for the capstone report.</div>
                 </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-icon success">↓</div>
-                <div className="activity-content">
-                  <div className="activity-top">
-                    <div>
-                      <div className="activity-title">File opened</div>
-                      <div className="activity-meta">Alex Raman • UI_Assets_Review.zip • 11:31 AM</div>
-                    </div>
-                    <span className="activity-badge success">Opened</span>
-                  </div>
-                  <div className="activity-desc">UI assets file accessed successfully.</div>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-icon warn">!</div>
-                <div className="activity-content">
-                  <div className="activity-top">
-                    <div>
-                      <div className="activity-title">Link expiring soon</div>
-                      <div className="activity-meta">Sam Khan • Meeting_Notes_TA.docx • 9:42 AM</div>
-                    </div>
-                    <span className="activity-badge warn">Warning</span>
-                  </div>
-                  <div className="activity-desc">File not opened yet. Expires in 2 hours.</div>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-icon danger">×</div>
-                <div className="activity-content">
-                  <div className="activity-top">
-                    <div>
-                      <div className="activity-title">Failed access</div>
-                      <div className="activity-meta">Unknown • Midterm_Presentation_v3.pptx • 8:07 AM</div>
-                    </div>
-                    <span className="activity-badge danger">Critical</span>
-                  </div>
-                  <div className="activity-desc">Attempted to access expired link.</div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
@@ -105,28 +298,48 @@ export function ActivityLogPanel() {
             </div>
             <div className="card-body">
               <div className="rt-mini-list">
-                <div className="rt-mini-item">
-                  <div>
-                    <div className="rt-mini-title">Meeting_Notes_TA.docx</div>
-                    <div className="rt-mini-sub">
-                      Recipient has not opened the link and it dies in 2 hours.
-                    </div>
-                  </div>
-                  <div className="rt-metric">
-                    <div className="rt-metric-value">2h</div>
-                    <div className="rt-mini-sub">left</div>
-                  </div>
-                </div>
-                <div className="rt-mini-item">
-                  <div>
-                    <div className="rt-mini-title">Midterm_Presentation_v3.pptx</div>
-                    <div className="rt-mini-sub">Expired. If they still need it, resend now.</div>
-                  </div>
-                  <div className="rt-metric">
-                    <div className="rt-metric-value">0</div>
-                    <div className="rt-mini-sub">active links</div>
-                  </div>
-                </div>
+                {!logData || logLoading ? (
+                  <p className="al-side-hint">{logLoading ? 'Loading…' : 'Pick a rubric to load items.'}</p>
+                ) : null}
+                {logData && !logLoading ? (
+                  <>
+                    {logData.needsAttention.fromNotes.length === 0 &&
+                    logData.needsAttention.fromAi.length === 0 ? (
+                      <p className="al-side-hint">Nothing flagged for this rubric right now.</p>
+                    ) : null}
+                    {logData.needsAttention.fromNotes.map((n) => (
+                      <div key={n.noteId} className="rt-mini-item al-attention-item">
+                        <div>
+                          <div className="rt-mini-title">{n.uploadLabel}</div>
+                          <div className="rt-mini-sub">
+                            <span className={`al-priority-pill al-priority-pill--${n.priority}`}>{n.priority}</span>{' '}
+                            {n.authorEmail ?? 'Someone'}: {n.bodyPreview}
+                            {n.bodyPreview.length >= 220 ? '…' : ''}
+                          </div>
+                        </div>
+                        <div className="rt-metric">
+                          <div className="rt-mini-sub">note</div>
+                        </div>
+                      </div>
+                    ))}
+                    {logData.needsAttention.fromAi.map((item, idx) => (
+                      <div key={`ai-${item.fileLabel}-${idx}`} className="rt-mini-item al-attention-item">
+                        <div>
+                          <div className="rt-mini-title">{item.fileLabel}</div>
+                          <div className="rt-mini-sub">{item.reason}</div>
+                          {item.severity ? (
+                            <span className={`al-priority-pill al-priority-pill--${item.severity}`}>
+                              {item.severity}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="rt-metric">
+                          <div className="rt-mini-sub">AI</div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : null}
               </div>
             </div>
           </section>
@@ -135,38 +348,41 @@ export function ActivityLogPanel() {
               <div className="card-title">📊 Quick breakdown</div>
             </div>
             <div className="card-body">
-              <div className="rt-mini-list">
-                <div className="rt-mini-item">
-                  <div>
-                    <div className="rt-mini-title">Opened links</div>
-                    <div className="rt-mini-sub">Transfers that were clicked at least once.</div>
+              {!logData?.quickBreakdown || logLoading ? (
+                <p className="al-side-hint">
+                  {logLoading
+                    ? 'Loading…'
+                    : 'Run Generate insights on File Share for this rubric to build a team snapshot.'}
+                </p>
+              ) : (
+                <div className="al-breakdown-live">
+                  <div className="al-breakdown-meter">
+                    <span className="al-breakdown-meter-label">Overall completion (team vs rubric)</span>
+                    <span className="al-breakdown-meter-value">
+                      {logData.quickBreakdown.overallCompletionPercent}%
+                    </span>
                   </div>
-                  <div className="rt-metric">
-                    <div className="rt-metric-value">14</div>
-                    <div className="rt-mini-sub">of 18</div>
-                  </div>
+                  <p className="al-breakdown-prose">{logData.quickBreakdown.synthesis}</p>
+                  <p className="al-breakdown-prose al-breakdown-prose--muted">{logData.quickBreakdown.gapsAndRisks}</p>
+                  {logData.quickBreakdown.contributors.length > 0 ? (
+                    <ul className="al-breakdown-contribs">
+                      {logData.quickBreakdown.contributors.map((c, i) => (
+                        <li key={`${c.label}-${i}`}>
+                          <strong>{c.label}</strong> — {c.appearsToBeWorkingOn}
+                          {c.inferredFromNotesOrDocs ? (
+                            <span className="al-breakdown-hint"> ({c.inferredFromNotesOrDocs})</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {logData.snapshotUpdatedAt ? (
+                    <p className="al-breakdown-updated">
+                      Updated {formatShortDate(logData.snapshotUpdatedAt)}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="rt-mini-item">
-                  <div>
-                    <div className="rt-mini-title">Largest transfer</div>
-                    <div className="rt-mini-sub">UI_Assets_Review.zip moved the most data this week.</div>
-                  </div>
-                  <div className="rt-metric">
-                    <div className="rt-metric-value">812</div>
-                    <div className="rt-mini-sub">MB</div>
-                  </div>
-                </div>
-                <div className="rt-mini-item">
-                  <div>
-                    <div className="rt-mini-title">Average time to open</div>
-                    <div className="rt-mini-sub">How fast recipients actually respond after receiving a link.</div>
-                  </div>
-                  <div className="rt-metric">
-                    <div className="rt-metric-value">38m</div>
-                    <div className="rt-mini-sub">avg</div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </section>
         </aside>
@@ -175,23 +391,23 @@ export function ActivityLogPanel() {
       <section className="al-stats">
         <div className="al-stat red">
           <div className="al-stat-label">Events today</div>
-          <div className="al-stat-value">146</div>
-          <div className="al-stat-sub">Across uploads, opens, and shares</div>
+          <div className="al-stat-value">{logLoading ? '—' : stats.eventsToday}</div>
+          <div className="al-stat-sub">On this rubric&apos;s timeline</div>
         </div>
         <div className="al-stat gold">
-          <div className="al-stat-label">Flagged</div>
-          <div className="al-stat-value">7</div>
-          <div className="al-stat-sub">Need review or follow-up</div>
+          <div className="al-stat-label">Needs attention</div>
+          <div className="al-stat-value">{logLoading ? '—' : stats.attention}</div>
+          <div className="al-stat-sub">High-priority notes + AI flags</div>
         </div>
         <div className="al-stat blue">
-          <div className="al-stat-label">Users active</div>
-          <div className="al-stat-value">19</div>
-          <div className="al-stat-sub">Touched the workspace today</div>
+          <div className="al-stat-label">Voices in timeline</div>
+          <div className="al-stat-value">{logLoading ? '—' : stats.authors}</div>
+          <div className="al-stat-sub">Distinct people in recent meta</div>
         </div>
         <div className="al-stat green">
-          <div className="al-stat-label">Blocked attempts</div>
-          <div className="al-stat-value">8</div>
-          <div className="al-stat-sub">Stopped before access</div>
+          <div className="al-stat-label">Files removed</div>
+          <div className="al-stat-value">{logLoading ? '—' : stats.deletes}</div>
+          <div className="al-stat-sub">Logged deletes for this rubric</div>
         </div>
       </section>
     </div>

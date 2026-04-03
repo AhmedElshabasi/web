@@ -59,6 +59,7 @@ export default async function ProtectedLayout({
         note,
         is_rubric,
         report_status,
+        linked_rubric_upload_id,
         created_at,
         team_id,
         upload_files(
@@ -72,7 +73,8 @@ export default async function ProtectedLayout({
           id,
           author_email,
           body,
-          created_at
+          created_at,
+          priority
         )
       `,
       )

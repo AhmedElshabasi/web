@@ -21,11 +21,14 @@ export type UploadFileRow = {
 }
 
 /** Notes left by other workspace members on an upload (not the uploader’s share note). */
+export type UploadNotePriority = 'low' | 'normal' | 'high' | 'urgent'
+
 export type UploadNoteRow = {
   id: string
   author_email: string | null
   body: string
   created_at: string | null
+  priority?: UploadNotePriority | null
 }
 
 export type UploadPackageRow = {
@@ -37,6 +40,8 @@ export type UploadPackageRow = {
   is_rubric?: boolean | null
   /** Set for report uploads; null for rubrics. */
   report_status?: UploadReportStatus | null
+  /** Rubric package this report was last evaluated against (set on successful Generate insights). */
+  linked_rubric_upload_id?: string | null
   created_at: string | null
   team_id?: string | null
   upload_files: UploadFileRow[] | null

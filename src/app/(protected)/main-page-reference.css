@@ -1136,6 +1136,150 @@
   white-space: pre-wrap;
 }
 
+#main-page-root .insights-team-completion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+#main-page-root .insights-team-completion-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+#main-page-root .insights-team-completion-value {
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue);
+}
+
+#main-page-root .insights-subsection {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+#main-page-root .insights-subsection-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+#main-page-root .insights-attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#main-page-root .insights-attention-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  position: relative;
+}
+
+#main-page-root .insights-attention-file {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+#main-page-root .insights-attention-reason {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink2);
+}
+
+#main-page-root .insights-severity {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+#main-page-root .insights-severity--info {
+  color: var(--blue);
+  background: rgba(0, 61, 110, 0.1);
+}
+
+#main-page-root .insights-severity--warning {
+  color: var(--gold-dark);
+  background: rgba(240, 178, 31, 0.15);
+}
+
+#main-page-root .insights-severity--critical {
+  color: var(--red);
+  background: rgba(207, 7, 34, 0.1);
+}
+
+#main-page-root .insights-breakdown-text {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+
+#main-page-root .insights-breakdown-text--muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#main-page-root .insights-contributors {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#main-page-root .insights-contributor {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+#main-page-root .insights-contributor-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+#main-page-root .insights-contributor-on {
+  font-size: 12px;
+  color: var(--ink2);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+#main-page-root .insights-contributor-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 #main-page-root .insights-select-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2104,25 +2248,60 @@
   line-height: 1.6;
 }
 
-#main-page-root .al-live-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+#main-page-root .al-rubric-dropdown-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
-#main-page-root .al-live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 6px rgba(61, 214, 140, 0.12);
+#main-page-root .al-rubric-dropdown-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+#main-page-root .al-rubric-dropdown {
+  appearance: none;
+  min-width: min(280px, 72vw);
+  max-width: min(320px, 100%);
+  padding: 10px 36px 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.09);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='rgba(255,255,255,0.72)' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+#main-page-root .al-rubric-dropdown:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+#main-page-root .al-rubric-dropdown:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+#main-page-root .al-rubric-dropdown:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+#main-page-root .al-rubric-dropdown option {
+  color: var(--ink);
+  background: var(--surface);
 }
 
 #main-page-root .al-stats {
@@ -2354,6 +2533,135 @@
   border-color: rgba(207, 7, 34, 0.14);
 }
 
+#main-page-root .al-refresh-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+#main-page-root .al-loading,
+#main-page-root .al-empty-timeline,
+#main-page-root .al-side-hint {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+#main-page-root .al-empty-timeline {
+  padding: 12px 0;
+}
+
+#main-page-root .al-priority-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+#main-page-root .al-priority-pill--high {
+  background: rgba(240, 178, 31, 0.2);
+  color: #916300;
+}
+
+#main-page-root .al-priority-pill--urgent {
+  background: rgba(207, 7, 34, 0.12);
+  color: var(--red);
+}
+
+#main-page-root .al-priority-pill--info {
+  background: rgba(0, 61, 110, 0.1);
+  color: var(--blue);
+}
+
+#main-page-root .al-priority-pill--warning {
+  background: rgba(240, 178, 31, 0.15);
+  color: #916300;
+}
+
+#main-page-root .al-priority-pill--critical {
+  background: rgba(207, 7, 34, 0.12);
+  color: var(--red);
+}
+
+#main-page-root .al-attention-item {
+  align-items: flex-start;
+}
+
+#main-page-root .al-breakdown-live {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#main-page-root .al-breakdown-meter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+#main-page-root .al-breakdown-meter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+#main-page-root .al-breakdown-meter-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue);
+}
+
+#main-page-root .al-breakdown-prose {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+
+#main-page-root .al-breakdown-prose--muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#main-page-root .al-breakdown-contribs {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink2);
+}
+
+#main-page-root .al-breakdown-hint {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+#main-page-root .al-breakdown-updated {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#main-page-root .rt-note-priority {
+  font-weight: 700;
+  color: var(--gold-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 #main-page-root .al-side-stack {
   display: flex;
   flex-direction: column;
@@ -2509,6 +2817,17 @@
   #main-page-root .activity-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  #main-page-root .al-rubric-dropdown-wrap {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  #main-page-root .al-rubric-dropdown {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
   }
   #main-page-root .form-grid { grid-template-columns: 1fr; }
   #main-page-root .link-row { flex-direction: column; }
