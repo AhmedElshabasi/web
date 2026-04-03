@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
+import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import { WORKSPACE_ACTIVITY_EVENT } from '@/lib/workspaceActivityEvents'
 import type { ActivityLogPayload, ActivityTimelineItem } from '@/types/activityLog'
 import type { UploadPackageRow } from '@/types/uploadWorkspace'
 
@@ -93,14 +95,17 @@ export function ActivityLogPanel() {
     )
   }, [rubricPackages])
 
-  const loadLog = useCallback(async () => {
+  const loadLog = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
     if (!activeTeamId || !selectedRubricId) {
       setLogData(null)
-      setLogError(null)
+      if (!silent) setLogError(null)
       return
     }
-    setLogLoading(true)
-    setLogError(null)
+    if (!silent) {
+      setLogLoading(true)
+      setLogError(null)
+    }
     try {
       const res = await fetch(
         `/api/activity-log?rubricUploadId=${encodeURIComponent(selectedRubricId)}`,
@@ -111,28 +116,103 @@ export function ActivityLogPanel() {
       try {
         json = JSON.parse(text)
       } catch {
-        setLogError('Invalid response from server.')
-        setLogData(null)
+        if (!silent) {
+          setLogError('Invalid response from server.')
+          setLogData(null)
+        }
         return
       }
       if (!res.ok) {
         const err = json as { error?: string }
-        setLogError(err.error || 'Could not load activity log.')
-        setLogData(null)
+        if (!silent) {
+          setLogError(err.error || 'Could not load activity log.')
+          setLogData(null)
+        }
         return
       }
       setLogData(json as ActivityLogPayload)
+      if (!silent) setLogError(null)
     } catch {
-      setLogError('Network error loading activity log.')
-      setLogData(null)
+      if (!silent) {
+        setLogError('Network error loading activity log.')
+        setLogData(null)
+      }
     } finally {
-      setLogLoading(false)
+      if (!silent) setLogLoading(false)
     }
   }, [activeTeamId, selectedRubricId])
+
+  const loadLogRef = useRef(loadLog)
+  loadLogRef.current = loadLog
+
+  const silentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleSilentRefresh = useCallback(() => {
+    if (silentDebounceRef.current) clearTimeout(silentDebounceRef.current)
+    silentDebounceRef.current = setTimeout(() => {
+      silentDebounceRef.current = null
+      void loadLogRef.current({ silent: true })
+    }, 420)
+  }, [])
 
   useEffect(() => {
     void loadLog()
   }, [loadLog])
+
+  useEffect(() => {
+    const onWorkspaceActivity = () => scheduleSilentRefresh()
+    window.addEventListener(WORKSPACE_ACTIVITY_EVENT, onWorkspaceActivity)
+    return () => {
+      window.removeEventListener(WORKSPACE_ACTIVITY_EVENT, onWorkspaceActivity)
+      if (silentDebounceRef.current) clearTimeout(silentDebounceRef.current)
+    }
+  }, [scheduleSilentRefresh])
+
+  useEffect(() => {
+    const supabase = supabaseBrowser
+    if (!supabase || !activeTeamId) return
+    const channel = supabase
+      .channel(`activity-log-rt:${activeTeamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_insight_runs',
+          filter: `team_id=eq.${activeTeamId}`,
+        },
+        () => scheduleSilentRefresh(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rubric_insight_snapshots',
+          filter: `team_id=eq.${activeTeamId}`,
+        },
+        () => scheduleSilentRefresh(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'activity_events',
+          filter: `team_id=eq.${activeTeamId}`,
+        },
+        () => scheduleSilentRefresh(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'upload_notes' },
+        () => scheduleSilentRefresh(),
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [activeTeamId, scheduleSilentRefresh])
 
   const filteredTimeline = useMemo(() => {
     const list = logData?.timeline ?? []

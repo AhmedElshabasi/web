@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import { emitWorkspaceActivity } from '@/lib/workspaceActivityEvents'
 import type { UploadNoteRow, UploadPackageRow } from '@/types/uploadWorkspace'
 import { isUploadReportStatus, UPLOAD_REPORT_STATUS_LABELS } from '@/types/uploadWorkspace'
 
@@ -241,6 +242,7 @@ export function RecentTransfersPanel() {
         setDeleteConfirm(null)
         showToast('File deleted.')
         router.refresh()
+        emitWorkspaceActivity()
       } catch (e: unknown) {
         showToast(e instanceof Error ? e.message : 'Delete failed.')
       } finally {
@@ -277,6 +279,7 @@ export function RecentTransfersPanel() {
       if (error) throw error
       setNewNoteBody('')
       router.refresh()
+      emitWorkspaceActivity()
     } catch (e: unknown) {
       setNoteError(e instanceof Error ? e.message : 'Could not add note.')
     } finally {

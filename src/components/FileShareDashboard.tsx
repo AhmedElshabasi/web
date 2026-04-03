@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUploadsWorkspace } from '@/contexts/UploadsWorkspaceContext'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import { emitWorkspaceActivity } from '@/lib/workspaceActivityEvents'
 import type {
   RubricInsightNeedsAttentionItem,
   RubricInsightQuickBreakdown,
@@ -369,6 +370,7 @@ export function FileShareDashboard() {
         }
 
         router.refresh()
+        emitWorkspaceActivity()
 
         setInsightsResult({
           comment: commentText,
@@ -559,6 +561,7 @@ export function FileShareDashboard() {
       setShowResult(true)
       showToast('Upload complete.')
       router.refresh()
+      emitWorkspaceActivity()
       window.setTimeout(() => {
         router.refresh()
       }, 600)
