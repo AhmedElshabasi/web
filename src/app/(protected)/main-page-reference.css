@@ -703,6 +703,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  margin-top: 24px;
   margin-bottom: 24px;
 }
 
@@ -765,6 +766,30 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+}
+
+#main-page-root .card.card--accent-red,
+#main-page-root .card.card--accent-gold {
+  position: relative;
+}
+
+#main-page-root .card.card--accent-red::after,
+#main-page-root .card.card--accent-gold::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  pointer-events: none;
+}
+
+#main-page-root .card.card--accent-red::after {
+  background: var(--red);
+}
+
+#main-page-root .card.card--accent-gold::after {
+  background: var(--gold);
 }
 
 #main-page-root .card-header {

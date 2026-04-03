@@ -576,24 +576,6 @@ export function FileShareDashboard() {
         </div>
       </section>
 
-      <div className="dashboard-grid">
-        <div className="stat-card red">
-          <div className="stat-label">Files queued</div>
-          <div className="stat-value">{queue.length}</div>
-          <div className="stat-sub">Ready to send</div>
-        </div>
-        <div className="stat-card gold">
-          <div className="stat-label">Transfers created</div>
-          <div className="stat-value">{serverUploadCount}</div>
-          <div className="stat-sub">Upload batches</div>
-        </div>
-        <div className="stat-card blue">
-          <div className="stat-label">Total size moved</div>
-          <div className="stat-value">{fmtSize(serverTotalBytes + queueBytes)}</div>
-          <div className="stat-sub">Across all shares</div>
-        </div>
-      </div>
-
       {loadError ? (
         <div className="empty-state" style={{ marginBottom: 16, borderColor: 'var(--red)', color: 'var(--ink)' }}>
           {loadError}
@@ -611,7 +593,7 @@ export function FileShareDashboard() {
       ) : null}
 
       <div className="layout">
-        <section className="card">
+        <section className="card card--accent-red">
           <div className="card-header">
             <div className="card-title">📤 Upload</div>
           </div>
@@ -732,7 +714,7 @@ export function FileShareDashboard() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card card--accent-gold">
           <div className="card-header">
             <div className="card-title">📥 Insights </div>
           </div>
@@ -742,6 +724,24 @@ export function FileShareDashboard() {
             </div>
           </div>
         </section>
+      </div>
+
+      <div className="dashboard-grid">
+        <div className="stat-card red">
+          <div className="stat-label">Files queued</div>
+          <div className="stat-value">{queue.length}</div>
+          <div className="stat-sub">Ready to send</div>
+        </div>
+        <div className="stat-card gold">
+          <div className="stat-label">Transfers created</div>
+          <div className="stat-value">{serverUploadCount}</div>
+          <div className="stat-sub">Upload batches</div>
+        </div>
+        <div className="stat-card blue">
+          <div className="stat-label">Total size moved</div>
+          <div className="stat-value">{fmtSize(serverTotalBytes + queueBytes)}</div>
+          <div className="stat-sub">Across all shares</div>
+        </div>
       </div>
 
       <section className="card fs-team-insights" aria-labelledby="fs-team-insights-title">
