@@ -1,11 +1,7 @@
-/** Must run before `pdf-parse` (Vercel / pdfjs worker). */
-import 'pdf-parse/worker'
-import { CanvasFactory } from 'pdf-parse/worker'
-import { PDFParse } from 'pdf-parse'
-
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { z } from 'zod'
+import { extractPdfText, isPdfMime } from '@/lib/documentText'
 import { supabaseServerClientOrNull } from '@/lib/supabaseServer'
 
 export const runtime = 'nodejs'
@@ -27,22 +23,6 @@ Requirements:
 - If the extract is partial, fragmented, or looks like tables/legalese, say so briefly and summarize what is readable.
 - Use clear headings or bold labels sparingly; prefer plain paragraphs and bullets.
 - Do not invent facts that are not supported by the text.`
-
-async function extractPdfText(buffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer), CanvasFactory })
-  try {
-    const result = await parser.getText()
-    return (result.text || '').trim()
-  } finally {
-    await parser.destroy()
-  }
-}
-
-function isPdfMime(mime: string | null, filename: string): boolean {
-  const m = (mime || '').toLowerCase()
-  if (m === 'application/pdf') return true
-  return filename.toLowerCase().endsWith('.pdf')
-}
 
 async function handlePost(request: Request): Promise<NextResponse> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()

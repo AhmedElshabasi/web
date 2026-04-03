@@ -110,6 +110,14 @@ export function FileShareDashboard() {
   const [teamDeleteConfirm, setTeamDeleteConfirm] = useState<TeamDeleteConfirmTarget | null>(null)
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null)
   const [insightsWizard, setInsightsWizard] = useState<InsightsWizard>({ phase: 'idle' })
+  const [insightsResult, setInsightsResult] = useState<{
+    comment: string
+    scorePercent: number
+    rubricLabel: string
+    reportLabel: string
+  } | null>(null)
+  const insightsAbortRef = useRef<AbortController | null>(null)
+  const activeTeamIdRef = useRef(activeTeamId)
   const [selectedRubricUploadId, setSelectedRubricUploadId] = useState('')
   const [selectedReportValue, setSelectedReportValue] = useState('')
 
@@ -184,7 +192,14 @@ export function FileShareDashboard() {
   const hasRubricUploads = rubricPackages.length > 0
 
   useEffect(() => {
+    activeTeamIdRef.current = activeTeamId
+  }, [activeTeamId])
+
+  useEffect(() => {
+    insightsAbortRef.current?.abort()
+    insightsAbortRef.current = null
     setInsightsWizard({ phase: 'idle' })
+    setInsightsResult(null)
   }, [activeTeamId])
 
   useEffect(() => {
@@ -223,7 +238,10 @@ export function FileShareDashboard() {
   useEffect(() => {
     if (insightsWizard.phase !== 'running') return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setInsightsWizard({ phase: 'idle' })
+      if (e.key !== 'Escape') return
+      insightsAbortRef.current?.abort()
+      insightsAbortRef.current = null
+      setInsightsWizard({ phase: 'idle' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -246,14 +264,69 @@ export function FileShareDashboard() {
     )
     if (!reportRow) return
 
+    const rubricLabel = packagePrimaryLabel(rubricPkg)
+    const reportLabel = reportRow.fileName
+    const teamSnapshot = activeTeamId
+
+    insightsAbortRef.current?.abort()
+    const ac = new AbortController()
+    insightsAbortRef.current = ac
+
     setInsightsWizard({
       phase: 'running',
-      rubricLabel: packagePrimaryLabel(rubricPkg),
-      reportLabel: reportRow.fileName,
+      rubricLabel,
+      reportLabel,
       rubricUploadId: rubricPkg.id,
       reportUploadId: reportRow.uploadId,
       reportFileId: reportRow.fileId,
     })
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/ai/insights-rubric-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          signal: ac.signal,
+          body: JSON.stringify({
+            rubricUploadId: rubricPkg.id,
+            reportFileId: reportRow.fileId,
+          }),
+        })
+        const text = await res.text()
+        let payload: { error?: string; comment?: string; scorePercent?: unknown } = {}
+        try {
+          payload = JSON.parse(text) as typeof payload
+        } catch {
+          showToast('Unexpected response from server.')
+          return
+        }
+        if (!res.ok) {
+          showToast(typeof payload.error === 'string' ? payload.error : 'Could not generate insights.')
+          return
+        }
+        const score = Number(payload.scorePercent)
+        if (typeof payload.comment !== 'string' || !payload.comment.trim() || !Number.isFinite(score)) {
+          showToast('Invalid insights response.')
+          return
+        }
+        if (ac.signal.aborted || activeTeamIdRef.current !== teamSnapshot) return
+        const clamped = Math.min(100, Math.max(0, Math.round(score)))
+        setInsightsResult({
+          comment: payload.comment.trim(),
+          scorePercent: clamped,
+          rubricLabel,
+          reportLabel,
+        })
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+        if (e instanceof Error && e.name === 'AbortError') return
+        showToast('Network error while generating insights.')
+      } finally {
+        if (insightsAbortRef.current === ac) insightsAbortRef.current = null
+        setInsightsWizard({ phase: 'idle' })
+      }
+    })()
   }, [
     activeTeamId,
     reportOptions,
@@ -502,7 +575,7 @@ export function FileShareDashboard() {
         <div className="hero-inner">
           <div>
             <h1>
-              Upload files and
+              Upload reports and
               <br />
                get AI-powered insights.
             </h1>
@@ -682,6 +755,34 @@ export function FileShareDashboard() {
                 </>
               ) : (
                 <>
+                  {insightsResult ? (
+                    <div className="insights-result">
+                      <div className="insights-result-top">
+                        <div className="insights-score-block" aria-label="Rubric alignment score">
+                          <span className="insights-score-number">{insightsResult.scorePercent}</span>
+                          <span className="insights-score-percent">%</span>
+                        </div>
+                        <div className="insights-result-headlines">
+                          <div className="insights-result-pair">
+                            <span className="insights-result-pair-label">Rubric</span>
+                            <span className="insights-result-pair-value">{insightsResult.rubricLabel}</span>
+                          </div>
+                          <div className="insights-result-pair">
+                            <span className="insights-result-pair-label">Report</span>
+                            <span className="insights-result-pair-value">{insightsResult.reportLabel}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="secondary-btn insights-result-dismiss"
+                          onClick={() => setInsightsResult(null)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                      <p className="insights-comment">{insightsResult.comment}</p>
+                    </div>
+                  ) : null}
                   <p className="insights-placeholder">Upload a report to gain some insights</p>
                   <div className="insights-select-row">
                     <div className="insights-select-field">
