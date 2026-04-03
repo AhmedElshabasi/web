@@ -73,7 +73,8 @@ export default async function ProtectedLayout({
           id,
           author_email,
           body,
-          created_at
+          created_at,
+          priority
         )
       `,
       )

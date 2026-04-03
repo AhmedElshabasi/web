@@ -2533,6 +2533,135 @@
   border-color: rgba(207, 7, 34, 0.14);
 }
 
+#main-page-root .al-refresh-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+#main-page-root .al-loading,
+#main-page-root .al-empty-timeline,
+#main-page-root .al-side-hint {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+#main-page-root .al-empty-timeline {
+  padding: 12px 0;
+}
+
+#main-page-root .al-priority-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+#main-page-root .al-priority-pill--high {
+  background: rgba(240, 178, 31, 0.2);
+  color: #916300;
+}
+
+#main-page-root .al-priority-pill--urgent {
+  background: rgba(207, 7, 34, 0.12);
+  color: var(--red);
+}
+
+#main-page-root .al-priority-pill--info {
+  background: rgba(0, 61, 110, 0.1);
+  color: var(--blue);
+}
+
+#main-page-root .al-priority-pill--warning {
+  background: rgba(240, 178, 31, 0.15);
+  color: #916300;
+}
+
+#main-page-root .al-priority-pill--critical {
+  background: rgba(207, 7, 34, 0.12);
+  color: var(--red);
+}
+
+#main-page-root .al-attention-item {
+  align-items: flex-start;
+}
+
+#main-page-root .al-breakdown-live {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#main-page-root .al-breakdown-meter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+#main-page-root .al-breakdown-meter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+#main-page-root .al-breakdown-meter-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue);
+}
+
+#main-page-root .al-breakdown-prose {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+
+#main-page-root .al-breakdown-prose--muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#main-page-root .al-breakdown-contribs {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink2);
+}
+
+#main-page-root .al-breakdown-hint {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+#main-page-root .al-breakdown-updated {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#main-page-root .rt-note-priority {
+  font-weight: 700;
+  color: var(--gold-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 #main-page-root .al-side-stack {
   display: flex;
   flex-direction: column;

@@ -152,6 +152,7 @@ export function RecentTransfersPanel() {
   const [sortKey, setSortKey] = useState<TransferSortKey>('newest')
   const [addNoteFor, setAddNoteFor] = useState<UploadPackageRow | null>(null)
   const [newNoteBody, setNewNoteBody] = useState('')
+  const [newNotePriority, setNewNotePriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal')
   const [noteBusy, setNoteBusy] = useState(false)
   const [noteError, setNoteError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -161,6 +162,7 @@ export function RecentTransfersPanel() {
   useEffect(() => {
     if (!addNoteFor) {
       setNewNoteBody('')
+      setNewNotePriority('normal')
       setNoteError(null)
     }
   }, [addNoteFor])
@@ -219,6 +221,13 @@ export function RecentTransfersPanel() {
           )
         }
 
+        const { error: logErr } = await supabaseBrowser.rpc('log_file_deleted_event', {
+          p_upload_id: target.uploadId,
+          p_file_id: target.fileId,
+          p_original_name: target.originalName,
+        })
+        if (logErr) console.warn('[activity] log_file_deleted_event:', logErr.message)
+
         const { data: remaining } = await supabaseBrowser
           .from('upload_files')
           .select('id')
@@ -263,6 +272,7 @@ export function RecentTransfersPanel() {
       const { error } = await supabaseBrowser.from('upload_notes').insert({
         upload_id: addNoteFor.id,
         body,
+        priority: newNotePriority,
       })
       if (error) throw error
       setNewNoteBody('')
@@ -272,7 +282,7 @@ export function RecentTransfersPanel() {
     } finally {
       setNoteBusy(false)
     }
-  }, [addNoteFor, newNoteBody, router])
+  }, [addNoteFor, newNoteBody, newNotePriority, router])
 
   const dialogNotes = useMemo(
     () => (addNoteFor ? sortNotesDesc(addNoteFor.upload_notes) : []),
@@ -370,6 +380,9 @@ export function RecentTransfersPanel() {
                     <li key={n.id} className="rt-note-item">
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
                         {(n.author_email ?? 'Someone') + ' · ' + formatNoteTime(n.created_at)}
+                        {n.priority === 'high' || n.priority === 'urgent' ? (
+                          <span className="rt-note-priority"> · {n.priority}</span>
+                        ) : null}
                       </div>
                       <div style={{ whiteSpace: 'pre-wrap' }}>{n.body}</div>
                     </li>
@@ -390,6 +403,22 @@ export function RecentTransfersPanel() {
               placeholder="e.g. Thanks — reviewed the PDF."
               disabled={noteBusy}
             />
+            <label htmlFor="rt-note-priority" style={{ fontSize: 12, fontWeight: 600, display: 'block', marginTop: 12, marginBottom: 6 }}>
+              Priority
+            </label>
+            <select
+              id="rt-note-priority"
+              className="al-filter"
+              style={{ width: '100%', maxWidth: 280 }}
+              value={newNotePriority}
+              onChange={(e) => setNewNotePriority(e.target.value as typeof newNotePriority)}
+              disabled={noteBusy}
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High (shows in Activity Log)</option>
+              <option value="urgent">Urgent (shows in Activity Log)</option>
+            </select>
             {noteError ? (
               <p style={{ color: 'var(--red)', fontSize: 13, marginTop: 8 }}>{noteError}</p>
             ) : null}
