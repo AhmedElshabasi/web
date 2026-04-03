@@ -73,17 +73,6 @@ function packagePrimaryLabel(u: UploadPackageRow): string {
 type InsightsWizard =
   | { phase: 'idle' }
   | {
-      phase: 'pick-rubric'
-      reportUploadId: string
-      reportFileId: string
-      reportLabel: string
-    }
-  | {
-      phase: 'pick-report'
-      rubricUploadId: string
-      rubricLabel: string
-    }
-  | {
       phase: 'running'
       rubricLabel: string
       reportLabel: string
@@ -91,6 +80,10 @@ type InsightsWizard =
       reportUploadId: string
       reportFileId: string
     }
+
+function reportOptionValue(uploadId: string, fileId: string) {
+  return `${uploadId}:${fileId}`
+}
 
 export function FileShareDashboard() {
   const {
@@ -117,6 +110,8 @@ export function FileShareDashboard() {
   const [teamDeleteConfirm, setTeamDeleteConfirm] = useState<TeamDeleteConfirmTarget | null>(null)
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null)
   const [insightsWizard, setInsightsWizard] = useState<InsightsWizard>({ phase: 'idle' })
+  const [selectedRubricUploadId, setSelectedRubricUploadId] = useState('')
+  const [selectedReportValue, setSelectedReportValue] = useState('')
 
   const queueBytes = useMemo(() => queue.reduce((a, f) => a + f.size, 0), [queue])
 
@@ -186,10 +181,33 @@ export function FileShareDashboard() {
   }, [reportPackages])
 
   const hasReportUploads = reportPackages.length > 0
+  const hasRubricUploads = rubricPackages.length > 0
 
   useEffect(() => {
     setInsightsWizard({ phase: 'idle' })
   }, [activeTeamId])
+
+  useEffect(() => {
+    if (rubricPackages.length === 0) {
+      setSelectedRubricUploadId('')
+      return
+    }
+    setSelectedRubricUploadId((prev) =>
+      rubricPackages.some((p) => p.id === prev) ? prev : rubricPackages[0].id,
+    )
+  }, [rubricPackages])
+
+  useEffect(() => {
+    if (reportOptions.length === 0) {
+      setSelectedReportValue('')
+      return
+    }
+    setSelectedReportValue((prev) =>
+      reportOptions.some((r) => reportOptionValue(r.uploadId, r.fileId) === prev)
+        ? prev
+        : reportOptionValue(reportOptions[0].uploadId, reportOptions[0].fileId),
+    )
+  }, [reportOptions])
 
   useEffect(() => {
     if (!teamDeleteConfirm) return
@@ -203,13 +221,7 @@ export function FileShareDashboard() {
   }, [teamDeleteConfirm, deletingTeamId])
 
   useEffect(() => {
-    if (
-      insightsWizard.phase !== 'pick-rubric' &&
-      insightsWizard.phase !== 'pick-report' &&
-      insightsWizard.phase !== 'running'
-    ) {
-      return
-    }
+    if (insightsWizard.phase !== 'running') return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setInsightsWizard({ phase: 'idle' })
     }
@@ -219,84 +231,37 @@ export function FileShareDashboard() {
 
   const startGenerateInsights = useCallback(() => {
     if (!activeTeamId) return
-    const rubrics = rubricPackages
-    const reports = reportPackages
-    if (reports.length === 0) return
-    if (rubrics.length === 0) {
+    if (reportOptions.length === 0) return
+    if (rubricPackages.length === 0) {
       showToast('Please upload a rubric first.')
       return
     }
-    const defaultReportPkg = reports[0]
-    const defaultFile = defaultReportPkg.upload_files?.[0]
-    if (!defaultFile) return
+    const rubricPkg = rubricPackages.find((p) => p.id === selectedRubricUploadId) ?? rubricPackages[0]
+    const reportParts = selectedReportValue.split(':')
+    const reportUploadId = reportParts[0]
+    const reportFileId = reportParts[1]
+    if (!reportUploadId || !reportFileId) return
+    const reportRow = reportOptions.find(
+      (r) => r.uploadId === reportUploadId && r.fileId === reportFileId,
+    )
+    if (!reportRow) return
 
-    if (rubrics.length === 1 && reports.length === 1) {
-      setInsightsWizard({
-        phase: 'running',
-        rubricLabel: packagePrimaryLabel(rubrics[0]),
-        reportLabel: defaultFile.original_name,
-        rubricUploadId: rubrics[0].id,
-        reportUploadId: defaultReportPkg.id,
-        reportFileId: defaultFile.id,
-      })
-      return
-    }
-    if (rubrics.length === 1) {
-      setInsightsWizard({
-        phase: 'pick-report',
-        rubricUploadId: rubrics[0].id,
-        rubricLabel: packagePrimaryLabel(rubrics[0]),
-      })
-      return
-    }
     setInsightsWizard({
-      phase: 'pick-rubric',
-      reportUploadId: defaultReportPkg.id,
-      reportFileId: defaultFile.id,
-      reportLabel: defaultFile.original_name,
+      phase: 'running',
+      rubricLabel: packagePrimaryLabel(rubricPkg),
+      reportLabel: reportRow.fileName,
+      rubricUploadId: rubricPkg.id,
+      reportUploadId: reportRow.uploadId,
+      reportFileId: reportRow.fileId,
     })
-  }, [activeTeamId, rubricPackages, reportPackages, showToast])
-
-  const onPickRubric = useCallback(
-    (rubricPkg: UploadPackageRow) => {
-      setInsightsWizard((w) => {
-        if (w.phase !== 'pick-rubric') return w
-        if (reportPackages.length === 1) {
-          const rp = reportPackages[0]
-          const rf = rp.upload_files?.[0]
-          if (!rf) return { phase: 'idle' }
-          return {
-            phase: 'running',
-            rubricLabel: packagePrimaryLabel(rubricPkg),
-            reportLabel: rf.original_name,
-            rubricUploadId: rubricPkg.id,
-            reportUploadId: rp.id,
-            reportFileId: rf.id,
-          }
-        }
-        return {
-          phase: 'pick-report',
-          rubricUploadId: rubricPkg.id,
-          rubricLabel: packagePrimaryLabel(rubricPkg),
-        }
-      })
-    },
-    [reportPackages],
-  )
-
-  const onPickReport = useCallback((uploadId: string, fileId: string, fileName: string) => {
-    setInsightsWizard((w) => {
-      if (w.phase !== 'pick-report') return w
-      return {
-        phase: 'running',
-        rubricLabel: w.rubricLabel,
-        reportLabel: fileName,
-        rubricUploadId: w.rubricUploadId,
-        reportUploadId: uploadId,
-        reportFileId: fileId,
-      }
-    })
-  }, [])
+  }, [
+    activeTeamId,
+    reportOptions,
+    rubricPackages,
+    selectedRubricUploadId,
+    selectedReportValue,
+    showToast,
+  ])
 
   useEffect(() => {
     const supabase = supabaseBrowser
@@ -533,92 +498,6 @@ export function FileShareDashboard() {
         </div>
       ) : null}
 
-      {insightsWizard.phase === 'pick-rubric' ? (
-        <div
-          className="confirm-overlay"
-          role="presentation"
-          onClick={() => setInsightsWizard({ phase: 'idle' })}
-        >
-          <div
-            className="confirm-dialog insights-pick-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="insights-pick-rubric-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="insights-pick-rubric-title" className="confirm-dialog-title">
-              Choose a rubric
-            </h2>
-            <p className="confirm-dialog-body">
-              {reportPackages.length === 1 ? (
-                <>
-                  Multiple rubrics are available. Pick one to use with{' '}
-                  <strong>{insightsWizard.reportLabel}</strong>.
-                </>
-              ) : (
-                <>Multiple rubrics are available. Pick one, then choose which report to analyze.</>
-              )}
-            </p>
-            <ul className="insights-pick-list">
-              {rubricPackages.map((pkg) => (
-                <li key={pkg.id}>
-                  <button type="button" className="insights-pick-row" onClick={() => onPickRubric(pkg)}>
-                    {packagePrimaryLabel(pkg)}
-                    <span className="insights-pick-meta">{formatShortDate(pkg.created_at)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="confirm-dialog-actions">
-              <button type="button" className="secondary-btn" onClick={() => setInsightsWizard({ phase: 'idle' })}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {insightsWizard.phase === 'pick-report' ? (
-        <div
-          className="confirm-overlay"
-          role="presentation"
-          onClick={() => setInsightsWizard({ phase: 'idle' })}
-        >
-          <div
-            className="confirm-dialog insights-pick-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="insights-pick-report-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="insights-pick-report-title" className="confirm-dialog-title">
-              Choose a report
-            </h2>
-            <p className="confirm-dialog-body">
-              Rubric: <strong>{insightsWizard.rubricLabel}</strong>
-            </p>
-            <ul className="insights-pick-list">
-              {reportOptions.map((row) => (
-                <li key={`${row.uploadId}-${row.fileId}`}>
-                  <button
-                    type="button"
-                    className="insights-pick-row"
-                    onClick={() => onPickReport(row.uploadId, row.fileId, row.fileName)}
-                  >
-                    {row.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="confirm-dialog-actions">
-              <button type="button" className="secondary-btn" onClick={() => setInsightsWizard({ phase: 'idle' })}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <section className="hero">
         <div className="hero-inner">
           <div>
@@ -804,6 +683,55 @@ export function FileShareDashboard() {
               ) : (
                 <>
                   <p className="insights-placeholder">Upload a report to gain some insights</p>
+                  <div className="insights-select-row">
+                    <div className="insights-select-field">
+                      <label className="insights-select-label" htmlFor="insights-rubric-select">
+                        Rubric
+                      </label>
+                      <select
+                        id="insights-rubric-select"
+                        className="insights-select"
+                        value={selectedRubricUploadId}
+                        onChange={(e) => setSelectedRubricUploadId(e.target.value)}
+                        disabled={!hasRubricUploads}
+                      >
+                        {!hasRubricUploads ? (
+                          <option value="">No rubrics uploaded yet</option>
+                        ) : (
+                          rubricPackages.map((pkg) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {packagePrimaryLabel(pkg)} · {formatShortDate(pkg.created_at)}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                    <div className="insights-select-field">
+                      <label className="insights-select-label" htmlFor="insights-report-select">
+                        Report
+                      </label>
+                      <select
+                        id="insights-report-select"
+                        className="insights-select"
+                        value={selectedReportValue}
+                        onChange={(e) => setSelectedReportValue(e.target.value)}
+                        disabled={!hasReportUploads}
+                      >
+                        {!hasReportUploads ? (
+                          <option value="">No reports uploaded yet</option>
+                        ) : (
+                          reportOptions.map((row) => (
+                            <option
+                              key={reportOptionValue(row.uploadId, row.fileId)}
+                              value={reportOptionValue(row.uploadId, row.fileId)}
+                            >
+                              {row.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  </div>
                   {hasReportUploads ? (
                     <button
                       type="button"

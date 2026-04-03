@@ -1080,6 +1080,57 @@
   align-self: flex-start;
 }
 
+#main-page-root .insights-select-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  #main-page-root .insights-select-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+#main-page-root .insights-select-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+#main-page-root .insights-select-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+#main-page-root .insights-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+#main-page-root .insights-select:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+}
+
+#main-page-root .insights-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 #main-page-root .insights-running-rows {
   display: flex;
   flex-direction: column;
@@ -1147,50 +1198,6 @@
 #main-page-root .insights-spinner-hint {
   margin: 0;
   font-size: 12px;
-  color: var(--muted);
-}
-
-#main-page-root .confirm-dialog.insights-pick-dialog {
-  max-width: min(440px, 94vw);
-}
-
-#main-page-root .insights-pick-list {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: min(50vh, 320px);
-  overflow-y: auto;
-}
-
-#main-page-root .insights-pick-row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  width: 100%;
-  text-align: left;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-#main-page-root .insights-pick-row:hover {
-  border-color: var(--gold-dark);
-  background: rgba(240, 178, 31, 0.08);
-}
-
-#main-page-root .insights-pick-meta {
-  font-size: 12px;
-  font-weight: 500;
   color: var(--muted);
 }
 
