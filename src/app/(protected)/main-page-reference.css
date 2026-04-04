@@ -2360,6 +2360,55 @@
   gap: 20px;
 }
 
+#main-page-root .al-section-banner {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+#main-page-root .al-section-banner .card-title {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
+#main-page-root .al-section-banner--blue {
+  background: linear-gradient(135deg, var(--blue) 0%, color-mix(in srgb, var(--blue) 82%, #fff) 120%);
+  border-bottom-color: color-mix(in srgb, var(--blue) 55%, #000);
+}
+
+#main-page-root .al-section-banner--red {
+  background: linear-gradient(135deg, var(--red) 0%, color-mix(in srgb, var(--red) 78%, #380810) 100%);
+  border-bottom-color: color-mix(in srgb, var(--red) 50%, #000);
+}
+
+#main-page-root .al-section-banner--green {
+  background: linear-gradient(135deg, var(--green) 0%, color-mix(in srgb, var(--green) 72%, #0a2e1c) 100%);
+  border-bottom-color: color-mix(in srgb, var(--green) 45%, #000);
+}
+
+#main-page-root.dark-mode .al-section-banner {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+#main-page-root.dark-mode .al-section-banner--blue {
+  background: linear-gradient(135deg, #1a4a7a 0%, color-mix(in srgb, var(--blue) 55%, #0d2840) 100%);
+}
+
+#main-page-root.dark-mode .al-section-banner--red {
+  background: linear-gradient(135deg, #9a0618 0%, color-mix(in srgb, var(--red) 85%, #2a0508) 100%);
+}
+
+#main-page-root.dark-mode .al-section-banner--green {
+  background: linear-gradient(135deg, #147a4d 0%, #062818 100%);
+}
+
+#main-page-root .al-section-card-toolbar {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
 #main-page-root .al-toolbar {
   display: flex;
   flex-wrap: wrap;

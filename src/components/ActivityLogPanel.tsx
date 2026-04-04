@@ -296,9 +296,11 @@ export function ActivityLogPanel() {
       </section>
 
       <div className="al-layout">
-        <section className="card">
-          <div className="card-header">
+        <section className="card al-section-card">
+          <div className="al-section-banner al-section-banner--blue">
             <div className="card-title">🕘 Timeline</div>
+          </div>
+          <div className="card-header al-section-card-toolbar">
             <div className="al-toolbar">
               <input
                 className="al-search"
@@ -372,8 +374,8 @@ export function ActivityLogPanel() {
         </section>
 
         <aside className="rt-side-stack">
-          <section className="card">
-            <div className="card-header">
+          <section className="card al-section-card">
+            <div className="al-section-banner al-section-banner--red">
               <div className="card-title">⚠ Needs attention</div>
             </div>
             <div className="card-body">
@@ -423,8 +425,8 @@ export function ActivityLogPanel() {
               </div>
             </div>
           </section>
-          <section className="card">
-            <div className="card-header">
+          <section className="card al-section-card">
+            <div className="al-section-banner al-section-banner--green">
               <div className="card-title">📊 Quick breakdown</div>
             </div>
             <div className="card-body">
